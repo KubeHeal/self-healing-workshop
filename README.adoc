@@ -1,0 +1,104 @@
+= Self-Healing Workshop
+:toc: left
+:toclevels: 3
+
+== Overview
+
+This workshop demonstrates the **OpenShift AI Ops Self-Healing Platform** - an AI-powered self-healing solution for OpenShift clusters that combines deterministic automation with machine learning for intelligent incident response.
+
+=== What You'll Learn
+
+* **Module 0**: Introduction & Architecture - How the platform works
+* **Module 1**: ML Model Training with Tekton - Train anomaly detection models
+* **Module 2**: End-to-End Self-Healing with Lightspeed - Interactive AI-powered cluster management
+* **Module 3**: OpenShift Lightspeed Deep Dive - Technical integration details
+
+=== Prerequisites
+
+* OpenShift 4.18+ cluster with admin access
+* AgnosticD V2 configured (for deployment)
+* Red Hat Demo Platform AWS sandbox (recommended)
+
+== Getting Started
+
+=== Option 1: Using AgnosticD V2 (Recommended)
+
+The workshop includes an AgnosticD V2 workload that pre-deploys the entire platform:
+
+[source,bash]
+----
+cd ~/agnosticd-v2
+
+# Copy the workshop vars file
+cp /path/to/self-healing-workshop/agnosticd/vars/self-healing-workshop.yml ../agnosticd-v2-vars/
+
+# Provision the workshop environment
+./bin/agd provision -g workshop1 -c self-healing-workshop -a sandbox1234
+----
+
+=== Option 2: Manual Deployment
+
+If you prefer to deploy manually, follow the https://github.com/KubeHeal/openshift-aiops-platform[openshift-aiops-platform] README.
+
+== Local Development
+
+=== View Workshop Content Locally
+
+[source,bash]
+----
+# Using Podman (recommended)
+podman run --rm --name antora -v $PWD:/antora:z -p 8080:8080 -i -t ghcr.io/juliaaano/antora-viewer
+
+# Open http://localhost:8080 in your browser
+----
+
+=== Build Static HTML
+
+[source,bash]
+----
+podman run --rm -v $PWD:/antora:z ghcr.io/juliaaano/antora-viewer antora site.yml
+# Output in ./www/
+----
+
+== Workshop Structure
+
+[source]
+----
+self-healing-workshop/
+├── README.adoc                    # This file
+├── site.yml                       # Antora site configuration
+├── content/
+│   ├── antora.yml                 # Workshop attributes
+│   └── modules/ROOT/
+│       ├── nav.adoc               # Navigation
+│       └── pages/
+│           ├── index.adoc         # Welcome & prerequisites
+│           ├── module-00.adoc     # Introduction & Architecture
+│           ├── module-01.adoc     # ML Model Training with Tekton
+│           ├── module-02.adoc     # End-to-End Self-Healing
+│           └── module-03.adoc     # Lightspeed Deep Dive
+├── agnosticd/
+│   ├── vars/                      # AgnosticD variables
+│   └── workload/                  # AgnosticD workload role
+└── scripts/
+    └── validate-workshop.sh       # Workshop validation
+----
+
+== Resources
+
+* https://github.com/KubeHeal/openshift-aiops-platform[OpenShift AI Ops Platform]
+* https://github.com/agnosticd/agnosticd-v2[AgnosticD V2]
+* https://docs.openshift.com/container-platform/latest/lightspeed/[OpenShift Lightspeed]
+* https://modelcontextprotocol.io/[Model Context Protocol (MCP)]
+
+== License
+
+GNU General Public License v3.0
+
+== Contributing
+
+Contributions welcome! Please open an issue or PR.
+
+---
+
+**Made with ❤️ by the KubeHeal community**

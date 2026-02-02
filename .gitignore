@@ -1,0 +1,33 @@
+# Antora build output
+www/
+.cache/
+
+# Node modules (if using npm)
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Temp files
+*.tmp
+*.temp
+
+# Logs
+*.log
+
+# Secrets (never commit!)
+*secret*
+*credential*
+*.key
+*.pem
+
+# AgnosticD output
+agnosticd-v2-output/

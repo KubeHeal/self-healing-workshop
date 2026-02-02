@@ -1,0 +1,323 @@
+---
+# vim: set ft=ansible:
+
+# Main workload deployment for Self-Healing Platform
+# Deploys the complete platform via Helm and ArgoCD
+
+- name: Workload | Setting up Self-Healing Platform
+  ansible.builtin.debug:
+    msg: "Deploying Self-Healing Platform to {{ self_healing_platform_namespace }}"
+
+# Create the namespace
+- name: Workload | Create self-healing-platform namespace
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: "{{ self_healing_platform_namespace }}"
+        labels:
+          app.kubernetes.io/part-of: self-healing-platform
+          workshop: self-healing
+
+# Clone the platform repository
+- name: Workload | Create temp directory for platform repo
+  ansible.builtin.tempfile:
+    state: directory
+    prefix: self-healing-platform-
+  register: r_platform_temp_dir
+
+- name: Workload | Clone platform repository
+  ansible.builtin.git:
+    repo: "{{ self_healing_platform_git_repo }}"
+    dest: "{{ r_platform_temp_dir.path }}"
+    version: "{{ self_healing_platform_git_ref }}"
+    depth: 1
+
+# Install Validated Patterns Operator
+- name: Workload | Check if Validated Patterns Operator is installed
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: ClusterServiceVersion
+    namespace: openshift-operators
+    label_selectors:
+      - "operators.coreos.com/patterns-operator.openshift-operators"
+  register: r_vp_operator
+  failed_when: false
+
+- name: Workload | Install Validated Patterns Operator
+  when: r_vp_operator.resources | length == 0
+  block:
+    - name: Workload | Create Validated Patterns Operator Subscription
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: operators.coreos.com/v1alpha1
+          kind: Subscription
+          metadata:
+            name: patterns-operator
+            namespace: openshift-operators
+          spec:
+            channel: fast
+            installPlanApproval: Automatic
+            name: patterns-operator
+            source: community-operators
+            sourceNamespace: openshift-marketplace
+
+    - name: Workload | Wait for Validated Patterns Operator
+      kubernetes.core.k8s_info:
+        api_version: operators.coreos.com/v1alpha1
+        kind: ClusterServiceVersion
+        namespace: openshift-operators
+        label_selectors:
+          - "operators.coreos.com/patterns-operator.openshift-operators"
+      register: r_vp_operator_wait
+      until:
+        - r_vp_operator_wait.resources | length > 0
+        - r_vp_operator_wait.resources[0].status.phase == "Succeeded"
+      retries: 30
+      delay: 10
+
+# Create ServiceAccounts and RBAC
+- name: Workload | Create self-healing-workbench ServiceAccount
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ServiceAccount
+      metadata:
+        name: self-healing-workbench
+        namespace: "{{ self_healing_platform_namespace }}"
+
+- name: Workload | Create ClusterRoleBinding for self-healing-workbench
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: ClusterRoleBinding
+      metadata:
+        name: self-healing-workbench-cluster-admin
+      roleRef:
+        apiGroup: rbac.authorization.k8s.io
+        kind: ClusterRole
+        name: cluster-admin
+      subjects:
+        - kind: ServiceAccount
+          name: self-healing-workbench
+          namespace: "{{ self_healing_platform_namespace }}"
+
+- name: Workload | Create cluster-monitoring-view binding
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: ClusterRoleBinding
+      metadata:
+        name: self-healing-workbench-monitoring-view
+      roleRef:
+        apiGroup: rbac.authorization.k8s.io
+        kind: ClusterRole
+        name: cluster-monitoring-view
+      subjects:
+        - kind: ServiceAccount
+          name: self-healing-workbench
+          namespace: "{{ self_healing_platform_namespace }}"
+
+# Deploy using Helm
+- name: Workload | Check if Helm is available
+  ansible.builtin.command: helm version --short
+  register: r_helm_version
+  changed_when: false
+  failed_when: false
+
+- name: Workload | Deploy platform via Helm
+  when: r_helm_version.rc == 0
+  block:
+    - name: Workload | Add Helm dependencies
+      ansible.builtin.command:
+        cmd: helm dependency update
+        chdir: "{{ r_platform_temp_dir.path }}/charts/hub"
+      changed_when: true
+
+    - name: Workload | Deploy Self-Healing Platform Helm chart
+      kubernetes.core.helm:
+        name: self-healing-platform
+        chart_ref: "{{ r_platform_temp_dir.path }}/charts/hub"
+        release_namespace: "{{ self_healing_platform_namespace }}"
+        create_namespace: true
+        wait: true
+        timeout: 20m0s
+        values:
+          global:
+            pattern: self-healing-platform
+            namespace: "{{ self_healing_platform_namespace }}"
+            git:
+              repoURL: "{{ self_healing_platform_git_repo }}"
+              revision: "{{ self_healing_platform_git_ref }}"
+
+# Create ArgoCD Application for GitOps
+- name: Workload | Create ArgoCD Application
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: argoproj.io/v1alpha1
+      kind: Application
+      metadata:
+        name: self-healing-platform
+        namespace: openshift-gitops
+      spec:
+        project: default
+        source:
+          repoURL: "{{ self_healing_platform_git_repo }}"
+          targetRevision: "{{ self_healing_platform_git_ref }}"
+          path: charts/hub
+          helm:
+            values: |
+              global:
+                pattern: self-healing-platform
+                namespace: {{ self_healing_platform_namespace }}
+        destination:
+          server: https://kubernetes.default.svc
+          namespace: "{{ self_healing_platform_namespace }}"
+        syncPolicy:
+          automated:
+            prune: true
+            selfHeal: true
+          syncOptions:
+            - CreateNamespace=true
+
+# Wait for core components
+- name: Workload | Wait for coordination-engine deployment
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    name: coordination-engine
+    namespace: "{{ self_healing_platform_namespace }}"
+  register: r_coordination_engine
+  until:
+    - r_coordination_engine.resources | length > 0
+    - r_coordination_engine.resources[0].status.readyReplicas | default(0) > 0
+  retries: 60
+  delay: 10
+  failed_when: false
+
+- name: Workload | Wait for mcp-server deployment
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    name: mcp-server
+    namespace: "{{ self_healing_platform_namespace }}"
+  register: r_mcp_server
+  until:
+    - r_mcp_server.resources | length > 0
+    - r_mcp_server.resources[0].status.readyReplicas | default(0) > 0
+  retries: 60
+  delay: 10
+  failed_when: false
+
+# Deploy OpenShift Lightspeed if requested
+- name: Workload | Deploy OpenShift Lightspeed
+  when: self_healing_platform_deploy_lightspeed | default(false) | bool
+  block:
+    - name: Workload | Check if Lightspeed operator is installed
+      kubernetes.core.k8s_info:
+        api_version: operators.coreos.com/v1alpha1
+        kind: ClusterServiceVersion
+        namespace: openshift-lightspeed
+        label_selectors:
+          - "operators.coreos.com/lightspeed-operator.openshift-lightspeed"
+      register: r_lightspeed_csv
+      failed_when: false
+
+    - name: Workload | Install Lightspeed operator if not present
+      when: r_lightspeed_csv.resources | length == 0
+      block:
+        - name: Workload | Create openshift-lightspeed namespace
+          kubernetes.core.k8s:
+            state: present
+            definition:
+              apiVersion: v1
+              kind: Namespace
+              metadata:
+                name: openshift-lightspeed
+
+        - name: Workload | Create Lightspeed OperatorGroup
+          kubernetes.core.k8s:
+            state: present
+            definition:
+              apiVersion: operators.coreos.com/v1
+              kind: OperatorGroup
+              metadata:
+                name: openshift-lightspeed
+                namespace: openshift-lightspeed
+              spec:
+                targetNamespaces:
+                  - openshift-lightspeed
+
+        - name: Workload | Create Lightspeed Subscription
+          kubernetes.core.k8s:
+            state: present
+            definition:
+              apiVersion: operators.coreos.com/v1alpha1
+              kind: Subscription
+              metadata:
+                name: lightspeed-operator
+                namespace: openshift-lightspeed
+              spec:
+                channel: stable
+                installPlanApproval: Automatic
+                name: lightspeed-operator
+                source: redhat-operators
+                sourceNamespace: openshift-marketplace
+
+        - name: Workload | Wait for Lightspeed operator
+          kubernetes.core.k8s_info:
+            api_version: operators.coreos.com/v1alpha1
+            kind: ClusterServiceVersion
+            namespace: openshift-lightspeed
+            label_selectors:
+              - "operators.coreos.com/lightspeed-operator.openshift-lightspeed"
+          register: r_lightspeed_csv_wait
+          until:
+            - r_lightspeed_csv_wait.resources | length > 0
+            - r_lightspeed_csv_wait.resources[0].status.phase == "Succeeded"
+          retries: 30
+          delay: 10
+
+    - name: Workload | Note about OLSConfig
+      ansible.builtin.debug:
+        msg: |
+          ⚠️  OpenShift Lightspeed operator installed.
+          
+          To complete setup, create an LLM provider secret and OLSConfig:
+          
+          1. Create LLM API key secret:
+             oc create secret generic {{ self_healing_platform_llm_provider }}-credentials \
+               -n openshift-lightspeed \
+               --from-literal=api_key='your-api-key'
+          
+          2. Create OLSConfig (see workshop documentation)
+
+# Clean up temp directory
+- name: Workload | Clean up temp directory
+  ansible.builtin.file:
+    path: "{{ r_platform_temp_dir.path }}"
+    state: absent
+
+- name: Workload | Deployment complete
+  ansible.builtin.debug:
+    msg: |
+      ✅ Self-Healing Platform deployment complete!
+      
+      Namespace: {{ self_healing_platform_namespace }}
+      
+      Components deployed:
+      - Coordination Engine: {{ 'Ready' if r_coordination_engine.resources | length > 0 else 'Pending' }}
+      - MCP Server: {{ 'Ready' if r_mcp_server.resources | length > 0 else 'Pending' }}
+      - OpenShift Lightspeed: {{ 'Installed' if self_healing_platform_deploy_lightspeed else 'Skipped' }}
+      
+      Next steps:
+      1. If Lightspeed enabled, create OLSConfig with LLM credentials
+      2. Access OpenShift console and click Lightspeed icon
+      3. Follow the workshop modules

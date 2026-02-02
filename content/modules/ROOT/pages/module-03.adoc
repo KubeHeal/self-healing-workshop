@@ -1,0 +1,628 @@
+= Module 3: OpenShift Lightspeed Deep Dive (Optional)
+
+== Overview
+
+This optional module provides a technical deep dive into OpenShift Lightspeed integration. You'll learn how to configure OLSConfig, use the LightspeedClient API programmatically, and understand how to build custom integrations.
+
+**What you'll learn:**
+
+* Configure OLSConfig with different LLM providers
+* Use the LightspeedClient Python API
+* Process AI-powered responses programmatically
+* Extract actionable insights from Lightspeed
+* Integration patterns for custom tools
+
+== Prerequisites
+
+Before proceeding, ensure:
+
+* ✅ MCP Server deployed and running
+* ✅ Coordination Engine deployed and running
+* ✅ OpenShift Lightspeed configured with an LLM provider
+* ✅ Completed Module 1 and Module 2
+
+Verify services:
+[source,bash,role=execute]
+----
+oc get deployment mcp-server coordination-engine -n {namespace}
+oc get olsconfig cluster
+----
+
+== Part 1: OLSConfig Resource Configuration
+
+OpenShift Lightspeed is configured via the `OLSConfig` custom resource.
+
+=== Understanding OLSConfig
+
+[source,yaml]
+----
+apiVersion: ols.openshift.io/v1alpha1
+kind: OLSConfig
+metadata:
+  name: cluster
+  namespace: openshift-lightspeed
+spec:
+  llm:
+    providers:
+      - name: openai
+        type: openai
+        url: https://api.openai.com/v1
+        credentials:
+          secretRef:
+            name: openai-credentials
+            namespace: openshift-lightspeed
+    model: gpt-4
+    temperature: 0.7
+    max_tokens: 2000
+  rag:
+    enabled: true
+    vectorstore:
+      type: elasticsearch
+      url: https://elasticsearch:9200
+  logging:
+    level: INFO
+    format: json
+----
+
+=== View Current Configuration
+
+[source,bash,role=execute]
+----
+oc get olsconfig cluster -o yaml
+----
+
+=== Supported LLM Providers
+
+[cols="1,2,2"]
+|===
+|Provider |Type |Notes
+
+|**OpenAI**
+|`openai`
+|GPT-4, GPT-4-turbo recommended
+
+|**Google Gemini**
+|`gemini`
+|Gemini Pro, Gemini Ultra
+
+|**Anthropic Claude**
+|`anthropic`
+|Claude 3 Opus, Sonnet, Haiku
+
+|**IBM BAM**
+|`ibm_bam`
+|IBM internal models
+
+|**Azure OpenAI**
+|`azure_openai`
+|Azure-hosted OpenAI models
+|===
+
+=== Creating LLM Provider Secrets
+
+**For OpenAI:**
+[source,bash,role=execute]
+----
+oc create secret generic openai-credentials \
+  -n openshift-lightspeed \
+  --from-literal=api_key='your-api-key-here'
+----
+
+**For Google Gemini:**
+[source,bash,role=execute]
+----
+oc create secret generic gemini-credentials \
+  -n openshift-lightspeed \
+  --from-literal=api_key='your-gemini-key-here'
+----
+
+== Part 2: The 7 MCP Tools
+
+The MCP Server exposes these tools that Lightspeed can call:
+
+=== Tool Reference
+
+[cols="1,2,2"]
+|===
+|Tool |Description |Returns
+
+|`get-cluster-health`
+|Check namespace status, pods, ML models
+|Health summary with metrics
+
+|`list-pods`
+|Query pods with filtering
+|Pod list with details
+
+|`analyze-anomalies`
+|Call ML models for detection
+|Anomaly detection results + recommendations
+
+|`trigger-remediation`
+|Apply fixes via Coordination Engine
+|Remediation status and ID
+
+|`list-incidents`
+|Query historical incidents
+|Incident data with resolution info
+
+|`get-model-status`
+|Check KServe InferenceService health
+|Model status and endpoints
+
+|`list-models`
+|List available ML model catalog
+|Model names and capabilities
+|===
+
+=== How Tools Are Called
+
+When you ask Lightspeed a question, it:
+
+. Parses your natural language intent
+. Selects the appropriate MCP tool(s)
+. Calls the tool via MCP protocol
+. Receives structured JSON response
+. Formats a human-readable reply
+
+**Example Flow:**
+[source]
+----
+You: "What's the cluster health?"
+     │
+     ▼
+Lightspeed: Intent = "get health status"
+            Tool = "get-cluster-health"
+     │
+     ▼
+MCP Server: GET /tools/get-cluster-health
+            Params: {namespace: "self-healing-platform"}
+     │
+     ▼
+Coordination Engine: Query Kubernetes API
+                     Check InferenceServices
+     │
+     ▼
+Response: {
+  "status": "healthy",
+  "pods": [...],
+  "models": [...]
+}
+     │
+     ▼
+Lightspeed: "✅ Cluster Health Summary for self-healing-platform:
+            Healthy Components (4): ..."
+----
+
+== Part 3: LightspeedClient Python API
+
+For programmatic access, you can use the LightspeedClient:
+
+=== Basic Usage
+
+[source,python]
+----
+import requests
+from typing import Dict, Any
+
+class LightspeedClient:
+    """Client for OpenShift Lightspeed communication."""
+    
+    def __init__(self, server_url: str, timeout: int = 30):
+        self.server_url = server_url
+        self.timeout = timeout
+        self.session = requests.Session()
+    
+    def query(self, question: str, context: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Send query to Lightspeed."""
+        try:
+            payload = {
+                'question': question,
+                'context': context or {}
+            }
+            
+            response = self.session.post(
+                f"{self.server_url}/query",
+                json=payload,
+                timeout=self.timeout
+            )
+            
+            if response.status_code == 200:
+                return response.json()
+            else:
+                return {'error': response.text}
+        except Exception as e:
+            return {'error': str(e)}
+    
+    def get_recommendations(self, issue_type: str, context: Dict[str, Any]) -> Dict[str, Any]:
+        """Get AI recommendations for issue."""
+        try:
+            payload = {
+                'issue_type': issue_type,
+                'context': context
+            }
+            
+            response = self.session.post(
+                f"{self.server_url}/recommendations",
+                json=payload,
+                timeout=self.timeout
+            )
+            
+            if response.status_code == 200:
+                return response.json()
+            else:
+                return {'error': response.text}
+        except Exception as e:
+            return {'error': str(e)}
+----
+
+=== Sending Queries
+
+[source,python]
+----
+# Initialize client
+OLS_SERVER_URL = 'http://ols-server:8000'
+client = LightspeedClient(OLS_SERVER_URL)
+
+# Send a query
+response = client.query(
+    "How do I troubleshoot high CPU usage in OpenShift pods?",
+    context={'namespace': 'self-healing-platform'}
+)
+
+print(response)
+----
+
+=== Getting Recommendations
+
+[source,python]
+----
+# Get recommendations for a specific issue
+issue_context = {
+    'pod_name': 'coordination-engine-0',
+    'namespace': 'self-healing-platform',
+    'cpu_usage': 85,
+    'memory_usage': 72,
+    'restart_count': 2
+}
+
+recommendations = client.get_recommendations(
+    'high_resource_usage',
+    issue_context
+)
+
+print(recommendations)
+----
+
+== Part 4: Extracting Actionable Insights
+
+Process Lightspeed responses to extract actionable information:
+
+[source,python]
+----
+from datetime import datetime
+from typing import Dict, Any
+
+def extract_insights(response: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Extract actionable insights from Lightspeed response.
+    
+    Args:
+        response: Lightspeed response
+    
+    Returns:
+        Extracted insights with confidence scores
+    """
+    if 'error' in response:
+        return {'status': 'error', 'message': response['error']}
+    
+    # Extract key information
+    insights = {
+        'status': 'success',
+        'timestamp': datetime.now().isoformat(),
+        'answer': response.get('answer', ''),
+        'confidence': response.get('confidence', 0.0),
+        'sources': response.get('sources', []),
+        'recommendations': response.get('recommendations', [])
+    }
+    
+    return insights
+
+# Usage
+query_response = client.query("Why is my pod failing?")
+insights = extract_insights(query_response)
+
+print(f"Confidence: {insights['confidence']:.2%}")
+print(f"Recommendations: {insights['recommendations']}")
+----
+
+== Part 5: Integration Patterns
+
+=== Pattern 1: Automated Alert Response
+
+[source,python]
+----
+def handle_prometheus_alert(alert: dict):
+    """Respond to Prometheus alert with Lightspeed."""
+    
+    # Build context from alert
+    context = {
+        'alert_name': alert['labels']['alertname'],
+        'namespace': alert['labels'].get('namespace', 'default'),
+        'severity': alert['labels'].get('severity', 'warning'),
+        'description': alert['annotations'].get('description', ''),
+    }
+    
+    # Query Lightspeed for analysis
+    client = LightspeedClient('http://ols-server:8000')
+    
+    analysis = client.query(
+        f"Analyze this alert and suggest remediation: {context['description']}",
+        context=context
+    )
+    
+    # Extract recommendations
+    insights = extract_insights(analysis)
+    
+    if insights['confidence'] > 0.8:
+        # High confidence - auto-remediate
+        return {
+            'action': 'auto_remediate',
+            'recommendations': insights['recommendations']
+        }
+    else:
+        # Low confidence - escalate to human
+        return {
+            'action': 'escalate',
+            'analysis': insights
+        }
+----
+
+=== Pattern 2: Batch Analysis
+
+[source,python]
+----
+import pandas as pd
+
+def analyze_pod_fleet(namespace: str) -> pd.DataFrame:
+    """Analyze all pods in namespace with Lightspeed."""
+    
+    client = LightspeedClient('http://ols-server:8000')
+    
+    # Get pod list
+    pods_response = client.query(
+        f"List all pods in {namespace} with their status",
+        context={'namespace': namespace}
+    )
+    
+    # Analyze each problematic pod
+    results = []
+    for pod in pods_response.get('pods', []):
+        if pod['status'] != 'Running':
+            analysis = client.query(
+                f"Why is pod {pod['name']} not running?",
+                context={'namespace': namespace, 'pod': pod['name']}
+            )
+            
+            results.append({
+                'pod': pod['name'],
+                'status': pod['status'],
+                'analysis': analysis.get('answer', ''),
+                'confidence': analysis.get('confidence', 0)
+            })
+    
+    return pd.DataFrame(results)
+----
+
+=== Pattern 3: Capacity Planning Report
+
+[source,python]
+----
+def generate_capacity_report(namespace: str) -> dict:
+    """Generate capacity planning report with predictions."""
+    
+    client = LightspeedClient('http://ols-server:8000')
+    
+    # Get current usage
+    current = client.query(
+        f"What's the current resource usage in {namespace}?",
+        context={'namespace': namespace}
+    )
+    
+    # Get predictions for key times
+    predictions = {}
+    for time in ['9 AM', '12 PM', '3 PM', '6 PM']:
+        pred = client.query(
+            f"What will resource usage be at {time}?",
+            context={'namespace': namespace}
+        )
+        predictions[time] = pred
+    
+    # Get capacity recommendations
+    recommendations = client.get_recommendations(
+        'capacity_planning',
+        {'namespace': namespace, 'timeframe': '7 days'}
+    )
+    
+    return {
+        'current_usage': current,
+        'predictions': predictions,
+        'recommendations': recommendations,
+        'generated_at': datetime.now().isoformat()
+    }
+----
+
+== Part 6: Hands-On Exercise
+
+Let's create a simple monitoring script:
+
+=== Create the Script
+
+[source,bash,role=execute]
+----
+cat > /tmp/monitor_with_lightspeed.py << 'EOF'
+#!/usr/bin/env python3
+"""
+Simple monitoring script using Lightspeed.
+"""
+
+import requests
+import time
+from datetime import datetime
+
+OLS_SERVER_URL = 'http://ols-server:8000'
+NAMESPACE = 'self-healing-platform'
+CHECK_INTERVAL = 60  # seconds
+
+def query_lightspeed(question, context=None):
+    """Send query to Lightspeed."""
+    try:
+        response = requests.post(
+            f"{OLS_SERVER_URL}/query",
+            json={'question': question, 'context': context or {}},
+            timeout=30
+        )
+        return response.json() if response.ok else {'error': response.text}
+    except Exception as e:
+        return {'error': str(e)}
+
+def check_cluster_health():
+    """Check cluster health via Lightspeed."""
+    print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Checking cluster health...")
+    
+    response = query_lightspeed(
+        f"Are there any issues in the {NAMESPACE} namespace?",
+        {'namespace': NAMESPACE}
+    )
+    
+    if 'error' in response:
+        print(f"  ⚠️  Error: {response['error']}")
+        return False
+    
+    # Check for issues in response
+    answer = response.get('answer', '').lower()
+    if any(word in answer for word in ['healthy', 'no issues', 'running']):
+        print(f"  ✅ All systems healthy")
+        return True
+    else:
+        print(f"  ⚠️  Potential issues detected:")
+        print(f"     {response.get('answer', 'Unknown')[:200]}")
+        return False
+
+def main():
+    """Main monitoring loop."""
+    print("=" * 60)
+    print("Lightspeed Cluster Monitor")
+    print(f"Namespace: {NAMESPACE}")
+    print(f"Check interval: {CHECK_INTERVAL}s")
+    print("=" * 60)
+    
+    while True:
+        try:
+            check_cluster_health()
+            time.sleep(CHECK_INTERVAL)
+        except KeyboardInterrupt:
+            print("\n\nMonitoring stopped.")
+            break
+
+if __name__ == '__main__':
+    main()
+EOF
+----
+
+=== Run the Monitor (Optional)
+
+[source,bash]
+----
+# This would run in the Jupyter workbench or a pod with Python
+python /tmp/monitor_with_lightspeed.py
+----
+
+== Part 7: Understanding the Architecture
+
+=== Complete Data Flow
+
+[source]
+----
+┌─────────────────────────────────────────────────────────────────┐
+│                     User Interface Layer                         │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
+│  │ OCP Console │  │ Python API  │  │ Custom Integrations     │  │
+│  └──────┬──────┘  └──────┬──────┘  └───────────┬─────────────┘  │
+│         │                │                     │                 │
+│         └────────────────┴─────────────────────┘                 │
+│                          │                                       │
+│                          ▼                                       │
+├─────────────────────────────────────────────────────────────────┤
+│                     AI/LLM Layer                                │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │           OpenShift Lightspeed (OLS Server)             │   │
+│  │  • Natural language understanding                       │   │
+│  │  • MCP tool selection                                   │   │
+│  │  • Response formatting                                  │   │
+│  └────────────────────────┬────────────────────────────────┘   │
+│                           │ MCP Protocol                        │
+│                           ▼                                     │
+├─────────────────────────────────────────────────────────────────┤
+│                     Tool Layer                                  │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │              MCP Server (Go)                            │   │
+│  │  • 7 tools exposed via MCP protocol                     │   │
+│  │  • Routes requests to Coordination Engine               │   │
+│  │  • Returns structured JSON responses                    │   │
+│  └────────────────────────┬────────────────────────────────┘   │
+│                           │ REST API                            │
+│                           ▼                                     │
+├─────────────────────────────────────────────────────────────────┤
+│                     Orchestration Layer                         │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │           Coordination Engine (Go)                       │   │
+│  │  • Queries Prometheus for metrics                       │   │
+│  │  • Calls KServe ML models                               │   │
+│  │  • Applies remediation to cluster                       │   │
+│  │  • Tracks incidents and history                         │   │
+│  └─────────┬─────────────────┬─────────────────┬───────────┘   │
+│            │                 │                 │                 │
+│            ▼                 ▼                 ▼                 │
+├─────────────────────────────────────────────────────────────────┤
+│                     Data/ML Layer                               │
+│  ┌───────────────┐ ┌───────────────┐ ┌───────────────────────┐ │
+│  │   Prometheus  │ │ KServe Models │ │   Kubernetes API      │ │
+│  │   (metrics)   │ │ (inference)   │ │   (cluster ops)       │ │
+│  └───────────────┘ └───────────────┘ └───────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+----
+
+== Summary
+
+In this deep dive, you learned:
+
+* ✅ How to configure OLSConfig with different LLM providers
+* ✅ The 7 MCP tools and how they're called
+* ✅ Using LightspeedClient for programmatic access
+* ✅ Extracting actionable insights from responses
+* ✅ Integration patterns for automation
+* ✅ The complete architecture data flow
+
+== Resources
+
+=== Documentation
+
+* https://docs.openshift.com/container-platform/latest/lightspeed/[OpenShift Lightspeed Documentation]
+* https://modelcontextprotocol.io/[Model Context Protocol Specification]
+* {platform_repo}[Platform GitHub Repository]
+
+=== Architecture Decision Records
+
+* https://github.com/KubeHeal/openshift-aiops-platform/blob/main/docs/adrs/016-openshift-lightspeed-olsconfig-integration.md[ADR-016: OLSConfig Integration]
+* https://github.com/KubeHeal/openshift-aiops-platform/blob/main/docs/adrs/036-go-based-standalone-mcp-server.md[ADR-036: Go-Based MCP Server]
+* https://github.com/KubeHeal/openshift-aiops-platform/blob/main/docs/adrs/038-go-coordination-engine-migration.md[ADR-038: Go Coordination Engine]
+
+=== Related Projects
+
+* {mcp_server_repo}[MCP Server Repository]
+* {coordination_engine_repo}[Coordination Engine Repository]
+
+---
+
+**Congratulations! You've completed the Self-Healing Workshop! 🎉**

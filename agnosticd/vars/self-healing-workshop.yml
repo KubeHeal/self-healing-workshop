@@ -1,0 +1,121 @@
+---
+# ===================================================================
+# Self-Healing Workshop - AgnosticD V2 Variables
+# ===================================================================
+# This file configures the Self-Healing Workshop deployment using
+# AgnosticD V2's openshift-workloads config.
+#
+# Usage:
+#   1. Copy this file to your agnosticd-v2-vars directory
+#   2. Update the cluster credentials section
+#   3. Run: ./bin/agd provision -g workshop1 -c self-healing-workshop -a sandbox1234
+# ===================================================================
+
+# ===================================================================
+# Mandatory Variables
+# ===================================================================
+cloud_provider: none
+config: openshift-workloads
+
+# ===================================================================
+# Collection Requirements
+# ===================================================================
+# The workload role is provided by this repository
+requirements_content:
+  collections:
+  - name: https://github.com/KubeHeal/self-healing-workshop.git
+    type: git
+    version: main
+
+# ===================================================================
+# Cluster Configuration
+# ===================================================================
+# For Red Hat Demo Platform sandboxes, use the provided credentials
+# For other clusters, update api_url and api_token
+clusters:
+- default:
+    api_url: "{{ cluster1.sandbox_openshift_api_url | default('https://api.cluster.example.com:6443') }}"
+    api_token: "{{ cluster1.sandbox_openshift_api_token | default('') }}"
+
+# ===================================================================
+# Workloads to Deploy
+# ===================================================================
+workloads:
+- kubeheal.self_healing_workshop.ocp4_workload_self_healing_platform
+
+# ===================================================================
+# Platform Configuration
+# ===================================================================
+
+# Git repository containing the Self-Healing Platform
+self_healing_platform_git_repo: "https://github.com/KubeHeal/openshift-aiops-platform.git"
+self_healing_platform_git_ref: "main"
+
+# Target namespace for deployment
+self_healing_platform_namespace: "self-healing-platform"
+
+# ===================================================================
+# OpenShift Lightspeed Configuration
+# ===================================================================
+
+# Enable OpenShift Lightspeed deployment
+self_healing_platform_deploy_lightspeed: true
+
+# LLM provider: openai, gemini, anthropic, ibm_bam, azure_openai
+self_healing_platform_llm_provider: "openai"
+
+# NOTE: After deployment, you must create the LLM API key secret:
+# oc create secret generic openai-credentials \
+#   -n openshift-lightspeed \
+#   --from-literal=api_key='your-api-key-here'
+
+# ===================================================================
+# Workshop Configuration
+# ===================================================================
+
+# Enable workshop mode (adds labels, enables verbose output)
+self_healing_platform_workshop_mode: true
+
+# Workshop name for labeling resources
+self_healing_platform_workshop_name: "self-healing-workshop"
+
+# ===================================================================
+# Model Training Configuration
+# ===================================================================
+
+# Data source for initial model training: prometheus, synthetic, hybrid
+self_healing_platform_training_data_source: "prometheus"
+
+# Initial training window in hours (168 = 1 week)
+self_healing_platform_training_hours: 168
+
+# ===================================================================
+# Resource Configuration
+# ===================================================================
+
+# Storage class (empty = cluster default, or specify: ocs-storagecluster-cephfs)
+self_healing_platform_storage_class: ""
+
+# Model storage size
+self_healing_platform_model_storage_size: "10Gi"
+
+# ===================================================================
+# Optional Features
+# ===================================================================
+
+# Deploy Jupyter workbench for notebook development
+self_healing_platform_deploy_workbench: true
+
+# Enable GPU workloads (requires GPU nodes with NVIDIA operator)
+self_healing_platform_deploy_gpu_workloads: false
+
+# ArgoCD configuration
+self_healing_platform_argocd_auto_sync: true
+self_healing_platform_argocd_self_heal: true
+
+# ===================================================================
+# Cleanup Configuration
+# ===================================================================
+
+# Remove OLSConfig when destroying (keeps operator for other workloads)
+self_healing_platform_cleanup_lightspeed: false

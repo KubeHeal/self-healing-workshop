@@ -1,0 +1,43 @@
+name: modules
+title: Self-Healing Workshop
+version: master
+nav:
+  - modules/ROOT/nav.adoc
+
+asciidoc:
+  attributes:
+    # Workshop metadata
+    lab_name: "OpenShift AI Ops Self-Healing Workshop"
+    release-version: master
+    page-pagination: true
+    
+    # Cluster configuration (set by AgnosticD or manually)
+    guid: "{guid}"
+    namespace: "self-healing-platform"
+    
+    # Access credentials (populated by deployment)
+    ssh_user: lab-user
+    ssh_password: "{ssh_password}"
+    ssh_command: "ssh {ssh_user}@bastion.{guid}.example.com"
+    
+    # OpenShift access
+    openshift_console_url: "https://console-openshift-console.apps.{guid}.example.com"
+    openshift_api_url: "https://api.{guid}.example.com:6443"
+    
+    # Platform URLs
+    argocd_url: "https://openshift-gitops-server-openshift-gitops.apps.{guid}.example.com"
+    jupyter_url: "https://self-healing-workbench-self-healing-platform.apps.{guid}.example.com"
+    
+    # GitHub repositories
+    platform_repo: "https://github.com/KubeHeal/openshift-aiops-platform"
+    mcp_server_repo: "https://github.com/KubeHeal/openshift-cluster-health-mcp"
+    coordination_engine_repo: "https://github.com/KubeHeal/openshift-coordination-engine"
+    
+    # External links
+    page-links:
+    - url: https://github.com/KubeHeal/openshift-aiops-platform
+      text: Platform GitHub
+    - url: https://docs.openshift.com/container-platform/latest/lightspeed/
+      text: Lightspeed Docs
+    - url: https://modelcontextprotocol.io/
+      text: MCP Protocol

@@ -1,0 +1,25 @@
+---
+# vim: set ft=ansible:
+
+# Main entry point for ocp4_workload_self_healing_platform
+# Deploys the OpenShift AI Ops Self-Healing Platform for workshop environments
+
+- name: Running Pre Workload tasks
+  ansible.builtin.include_tasks:
+    file: ./pre_workload.yml
+  when: ACTION == "create" or ACTION == "provision"
+
+- name: Running Workload tasks
+  ansible.builtin.include_tasks:
+    file: ./workload.yml
+  when: ACTION == "create" or ACTION == "provision"
+
+- name: Running Post Workload tasks
+  ansible.builtin.include_tasks:
+    file: ./post_workload.yml
+  when: ACTION == "create" or ACTION == "provision"
+
+- name: Running Remove Workload tasks
+  ansible.builtin.include_tasks:
+    file: ./remove_workload.yml
+  when: ACTION == "destroy" or ACTION == "remove"

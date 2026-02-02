@@ -1,0 +1,137 @@
+---
+# vim: set ft=ansible:
+
+# Pre-workload tasks for Self-Healing Platform
+# Validates cluster prerequisites before deployment
+
+- name: Pre-Workload | Setting up workload for user
+  ansible.builtin.debug:
+    msg: "Setting up Self-Healing Platform for {{ ocp_username }}"
+
+- name: Pre-Workload | Validate OpenShift cluster access
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Namespace
+    name: default
+  register: r_cluster_access
+  failed_when: r_cluster_access.resources | length == 0
+
+- name: Pre-Workload | Get cluster version
+  kubernetes.core.k8s_info:
+    api_version: config.openshift.io/v1
+    kind: ClusterVersion
+    name: version
+  register: r_cluster_version
+
+- name: Pre-Workload | Validate OpenShift version >= 4.18
+  ansible.builtin.assert:
+    that:
+      - r_cluster_version.resources[0].status.desired.version is version('4.18', '>=')
+    fail_msg: "OpenShift version must be 4.18 or higher. Current: {{ r_cluster_version.resources[0].status.desired.version }}"
+    success_msg: "OpenShift version {{ r_cluster_version.resources[0].status.desired.version }} validated"
+
+- name: Pre-Workload | Check for required operators - OpenShift GitOps
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: ClusterServiceVersion
+    namespace: openshift-operators
+    label_selectors:
+      - "operators.coreos.com/openshift-gitops-operator.openshift-operators"
+  register: r_gitops_csv
+  failed_when: false
+
+- name: Pre-Workload | Install OpenShift GitOps if not present
+  when: r_gitops_csv.resources | length == 0
+  block:
+    - name: Pre-Workload | Create OpenShift GitOps Subscription
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: operators.coreos.com/v1alpha1
+          kind: Subscription
+          metadata:
+            name: openshift-gitops-operator
+            namespace: openshift-operators
+          spec:
+            channel: latest
+            installPlanApproval: Automatic
+            name: openshift-gitops-operator
+            source: redhat-operators
+            sourceNamespace: openshift-marketplace
+
+    - name: Pre-Workload | Wait for OpenShift GitOps operator to be ready
+      kubernetes.core.k8s_info:
+        api_version: operators.coreos.com/v1alpha1
+        kind: ClusterServiceVersion
+        namespace: openshift-operators
+        label_selectors:
+          - "operators.coreos.com/openshift-gitops-operator.openshift-operators"
+      register: r_gitops_csv_wait
+      until:
+        - r_gitops_csv_wait.resources | length > 0
+        - r_gitops_csv_wait.resources[0].status.phase == "Succeeded"
+      retries: 30
+      delay: 10
+
+- name: Pre-Workload | Check for OpenShift Pipelines
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: ClusterServiceVersion
+    namespace: openshift-operators
+    label_selectors:
+      - "operators.coreos.com/openshift-pipelines-operator-rh.openshift-operators"
+  register: r_pipelines_csv
+  failed_when: false
+
+- name: Pre-Workload | Install OpenShift Pipelines if not present
+  when: r_pipelines_csv.resources | length == 0
+  block:
+    - name: Pre-Workload | Create OpenShift Pipelines Subscription
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: operators.coreos.com/v1alpha1
+          kind: Subscription
+          metadata:
+            name: openshift-pipelines-operator-rh
+            namespace: openshift-operators
+          spec:
+            channel: latest
+            installPlanApproval: Automatic
+            name: openshift-pipelines-operator-rh
+            source: redhat-operators
+            sourceNamespace: openshift-marketplace
+
+    - name: Pre-Workload | Wait for OpenShift Pipelines operator to be ready
+      kubernetes.core.k8s_info:
+        api_version: operators.coreos.com/v1alpha1
+        kind: ClusterServiceVersion
+        namespace: openshift-operators
+        label_selectors:
+          - "operators.coreos.com/openshift-pipelines-operator-rh.openshift-operators"
+      register: r_pipelines_csv_wait
+      until:
+        - r_pipelines_csv_wait.resources | length > 0
+        - r_pipelines_csv_wait.resources[0].status.phase == "Succeeded"
+      retries: 30
+      delay: 10
+
+- name: Pre-Workload | Check storage class availability
+  kubernetes.core.k8s_info:
+    api_version: storage.k8s.io/v1
+    kind: StorageClass
+  register: r_storage_classes
+  failed_when: r_storage_classes.resources | length == 0
+
+- name: Pre-Workload | Display available storage classes
+  ansible.builtin.debug:
+    msg: "Available storage classes: {{ r_storage_classes.resources | map(attribute='metadata.name') | list }}"
+
+- name: Pre-Workload | Validate prerequisites complete
+  ansible.builtin.debug:
+    msg: |
+      ✅ Pre-workload validation complete:
+      - OpenShift {{ r_cluster_version.resources[0].status.desired.version }}
+      - GitOps operator ready
+      - Pipelines operator ready
+      - Storage available

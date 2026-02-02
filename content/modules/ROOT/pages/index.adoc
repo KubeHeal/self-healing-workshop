@@ -1,0 +1,125 @@
+= {lab_name}
+
+Welcome to the **OpenShift AI Ops Self-Healing Workshop**!
+
+image::https://img.shields.io/badge/OpenShift-4.18+-red.svg[OpenShift 4.18+]
+image::https://img.shields.io/badge/AI%20Powered-Lightspeed-blue.svg[AI Powered]
+image::https://img.shields.io/badge/ML-KServe-green.svg[ML KServe]
+
+In this hands-on workshop, you'll learn how to leverage AI-powered self-healing capabilities in OpenShift. You'll train machine learning models, interact with your cluster using natural language, and watch automated remediation in action.
+
+== What You'll Learn
+
+[cols="1,3"]
+|===
+|Module |Description
+
+|*Module 0*
+|**Introduction & Architecture** - Understand the hybrid deterministic-AI approach and platform components
+
+|*Module 1*
+|**ML Model Training with Tekton** - Train anomaly detection and predictive analytics models using automated pipelines
+
+|*Module 2*
+|**End-to-End Self-Healing** - Chat with your cluster using OpenShift Lightspeed, deploy apps, break things, and watch AI fix them
+
+|*Module 3*
+|**Lightspeed Deep Dive** - Technical details on OLSConfig, MCP integration, and building custom tools
+|===
+
+== What's Already Deployed
+
+Your workshop environment comes pre-configured with:
+
+[cols="1,2"]
+|===
+|Component |Description
+
+|✅ **OpenShift Lightspeed**
+|AI assistant integrated into the OpenShift console
+
+|✅ **MCP Server**
+|Go service connecting Lightspeed to cluster tools
+
+|✅ **Coordination Engine**
+|Go service orchestrating remediation workflows
+
+|✅ **KServe ML Models**
+|Anomaly detection + capacity forecasting models
+
+|✅ **Jupyter Workbench**
+|Notebook environment for ML development
+
+|✅ **ArgoCD**
+|GitOps deployment via Validated Patterns
+|===
+
+== Prerequisites
+
+=== Skills Required
+
+* Basic OpenShift/Kubernetes knowledge (pods, deployments, services)
+* Familiarity with the OpenShift web console
+* Basic understanding of machine learning concepts (helpful but not required)
+
+=== Access Information
+
+[IMPORTANT]
+====
+Your instructor will provide the following credentials:
+
+* **OpenShift Console**: {openshift_console_url}
+* **Username**: `{ssh_user}`
+* **Password**: _Provided by instructor_
+====
+
+=== Verify Your Access
+
+. Open the OpenShift Console: {openshift_console_url}
+. Log in with provided credentials
+. Click the **Lightspeed icon** (sparkle icon) in the top-right corner
+. If the chat interface opens, you're ready to go!
+
+== Workshop Duration
+
+[cols="1,1,2"]
+|===
+|Module |Duration |Notes
+
+|Module 0
+|15 min
+|Introduction & overview
+
+|Module 1
+|30 min
+|ML training pipelines
+
+|Module 2
+|45 min
+|Interactive self-healing demo
+
+|Module 3
+|20 min
+|Optional deep dive
+|===
+
+**Total**: ~2 hours (1.5 hours without Module 3)
+
+== Getting Help
+
+If you encounter issues during the workshop:
+
+. Check the **Troubleshooting** sections in each module
+. Ask your instructor
+. Review the https://github.com/KubeHeal/openshift-aiops-platform/blob/main/docs/guides/TROUBLESHOOTING-GUIDE.md[Troubleshooting Guide]
+
+== Let's Get Started!
+
+When you're ready, proceed to xref:module-00.adoc[Module 0: Introduction & Architecture] to learn how the platform works before diving into hands-on exercises.
+
+---
+
+[NOTE]
+====
+**Architecture Note**: The MCP Server and Coordination Engine are **Go services** for production performance. The Jupyter notebooks are **Python** for ML/data science. You don't need to write Go code to use the platform!
+====
