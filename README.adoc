@@ -6,57 +6,144 @@
 
 This workshop demonstrates the **OpenShift AI Ops Self-Healing Platform** - an AI-powered self-healing solution for OpenShift clusters that combines deterministic automation with machine learning for intelligent incident response.
 
-=== What You'll Learn
+=== Workshop Modules
 
-* **Module 0**: Introduction & Architecture - How the platform works
-* **Module 1**: ML Model Training with Tekton - Train anomaly detection models
-* **Module 2**: End-to-End Self-Healing with Lightspeed - Interactive AI-powered cluster management
-* **Module 3**: OpenShift Lightspeed Deep Dive - Technical integration details
+[cols="1,3"]
+|===
+|Module |Description
+
+|**Module 0**
+|Introduction & Architecture - How the platform works
+
+|**Module 1**
+|ML Model Training with Tekton - Train anomaly detection models
+
+|**Module 2**
+|Deploy MCP Server & Configure Lightspeed - Setup required for demos _(Required)_
+
+|**Module 3**
+|End-to-End Self-Healing with Lightspeed - Interactive AI-powered cluster management
+
+|**Module 4**
+|Extra Credit - Advanced ML (LSTM, ensemble) and custom model deployment
+
+|**Module 5**
+|Notebook Catalog & Use Cases - Guide to 33+ Jupyter notebooks
+|===
 
 === Prerequisites
 
 * OpenShift 4.18+ cluster with admin access
-* AgnosticD V2 configured (for deployment)
 * Red Hat Demo Platform AWS sandbox (recommended)
+* LLM API key (OpenAI, Google Gemini, or Anthropic)
 
-== Getting Started
+== Deployment Options
 
 === Option 1: Using AgnosticD V2 (Recommended)
 
-The workshop includes an AgnosticD V2 workload that pre-deploys the entire platform:
+The workshop includes an AgnosticD V2 workload that pre-deploys the entire self-healing platform automatically.
+
+==== Step 1: Clone AgnosticD V2
+
+If you don't have AgnosticD V2 installed, clone it first:
+
+[source,bash]
+----
+# Clone AgnosticD V2
+git clone https://github.com/agnosticd/agnosticd-v2.git ~/agnosticd-v2
+cd ~/agnosticd-v2
+
+# Create vars directory for your configurations
+mkdir -p ~/agnosticd-v2-vars
+----
+
+==== Step 2: Set Up Workshop Configuration
+
+[source,bash]
+----
+# Clone the workshop repository
+git clone https://github.com/KubeHeal/self-healing-workshop.git ~/self-healing-workshop
+
+# Copy the workshop vars file to AgnosticD V2 vars directory
+cp ~/self-healing-workshop/agnosticd/vars/self-healing-workshop.yml ~/agnosticd-v2-vars/
+
+# Edit the vars file to configure your environment
+vi ~/agnosticd-v2-vars/self-healing-workshop.yml
+----
+
+==== Step 3: Configure Cluster Credentials
+
+Edit `~/agnosticd-v2-vars/self-healing-workshop.yml` and update:
+
+[source,yaml]
+----
+clusters:
+- default:
+    api_url: "https://api.YOUR_CLUSTER.example.com:6443"
+    api_token: "sha256~YOUR_TOKEN_HERE"
+
+# LLM Provider (choose one)
+self_healing_platform_llm_provider: "openai"  # or "gemini", "anthropic"
+----
+
+==== Step 4: Provision the Workshop
 
 [source,bash]
 ----
 cd ~/agnosticd-v2
 
-# Copy the workshop vars file
-cp /path/to/self-healing-workshop/agnosticd/vars/self-healing-workshop.yml ../agnosticd-v2-vars/
-
 # Provision the workshop environment
-./bin/agd provision -g workshop1 -c self-healing-workshop -a sandbox1234
+./bin/agd provision -g workshop1 -c self-healing-workshop -a YOUR_SANDBOX_NAME
 ----
+
+The workload will:
+
+* ✅ Deploy Validated Patterns Operator
+* ✅ Deploy the Self-Healing Platform (ArgoCD, ML models, coordination engine)
+* ✅ Configure OpenShift Lightspeed with MCP Server
+* ✅ Set up Jupyter workbench with all notebooks
 
 === Option 2: Manual Deployment
 
-If you prefer to deploy manually, follow the https://github.com/KubeHeal/openshift-aiops-platform[openshift-aiops-platform] README.
-
-== Local Development
-
-=== View Workshop Content Locally
+If you prefer to deploy manually without AgnosticD V2:
 
 [source,bash]
 ----
-# Using Podman (recommended)
-podman run --rm --name antora -v $PWD:/antora:z -p 8080:8080 -i -t ghcr.io/juliaaano/antora-viewer
+# Clone the main platform repository
+git clone https://github.com/KubeHeal/openshift-aiops-platform.git
+cd openshift-aiops-platform
 
-# Open http://localhost:8080 in your browser
+# Follow the README for deployment
+# https://github.com/KubeHeal/openshift-aiops-platform#installation
+----
+
+== Access the Workshop
+
+=== Online (GitHub Pages)
+
+The workshop is published at:
+
+**https://kubeheal.github.io/self-healing-workshop/**
+
+=== Local Preview
+
+[source,bash]
+----
+# Clone repository
+git clone https://github.com/KubeHeal/self-healing-workshop.git
+cd self-healing-workshop
+
+# Using Podman (recommended)
+podman run --rm --name antora -v $PWD:/antora:z -p 8080:8080 ghcr.io/juliaaano/antora-viewer
+
+# Open http://localhost:8080/modules/index.html in your browser
 ----
 
 === Build Static HTML
 
 [source,bash]
 ----
-podman run --rm -v $PWD:/antora:z ghcr.io/juliaaano/antora-viewer antora site.yml
+podman run --rm -v $PWD:/antora:z ghcr.io/juliaaano/antora-viewer antora default-site.yml
 # Output in ./www/
 ----
 
@@ -67,6 +154,7 @@ podman run --rm -v $PWD:/antora:z ghcr.io/juliaaano/antora-viewer antora site.ym
 self-healing-workshop/
 ├── README.adoc                    # This file
 ├── site.yml                       # Antora site configuration
+├── default-site.yml               # Default Antora playbook
 ├── content/
 │   ├── antora.yml                 # Workshop attributes
 │   └── modules/ROOT/
@@ -75,21 +163,36 @@ self-healing-workshop/
 │           ├── index.adoc         # Welcome & prerequisites
 │           ├── module-00.adoc     # Introduction & Architecture
 │           ├── module-01.adoc     # ML Model Training with Tekton
-│           ├── module-02.adoc     # End-to-End Self-Healing
-│           └── module-03.adoc     # Lightspeed Deep Dive
+│           ├── module-02.adoc     # Deploy MCP Server & Configure Lightspeed
+│           ├── module-03.adoc     # End-to-End Self-Healing
+│           ├── module-04.adoc     # Extra Credit - Advanced ML
+│           └── module-05.adoc     # Notebook Catalog & Use Cases
 ├── agnosticd/
-│   ├── vars/                      # AgnosticD variables
+│   ├── vars/                      # AgnosticD variables template
+│   │   └── self-healing-workshop.yml
 │   └── workload/                  # AgnosticD workload role
+│       └── ocp4_workload_self_healing_platform/
+├── .github/
+│   └── workflows/
+│       └── deploy-pages.yml       # GitHub Pages deployment
 └── scripts/
     └── validate-workshop.sh       # Workshop validation
 ----
 
 == Resources
 
-* https://github.com/KubeHeal/openshift-aiops-platform[OpenShift AI Ops Platform]
-* https://github.com/agnosticd/agnosticd-v2[AgnosticD V2]
-* https://docs.openshift.com/container-platform/latest/lightspeed/[OpenShift Lightspeed]
-* https://modelcontextprotocol.io/[Model Context Protocol (MCP)]
+=== KubeHeal Repositories
+
+* https://github.com/KubeHeal/openshift-aiops-platform[OpenShift AI Ops Platform] - Main platform
+* https://github.com/KubeHeal/openshift-cluster-health-mcp[Cluster Health MCP Server] - MCP Server (Go)
+* https://github.com/KubeHeal/openshift-coordination-engine[Coordination Engine] - Remediation orchestration (Go)
+
+=== External Documentation
+
+* https://github.com/agnosticd/agnosticd-v2[AgnosticD V2] - Deployment framework
+* https://docs.openshift.com/container-platform/latest/lightspeed/[OpenShift Lightspeed] - AI assistant
+* https://modelcontextprotocol.io/[Model Context Protocol (MCP)] - AI tool integration
+* https://kserve.github.io/website/[KServe] - Model serving
 
 == License
 
