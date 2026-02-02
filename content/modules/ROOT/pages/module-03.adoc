@@ -1,628 +1,731 @@
-= Module 3: OpenShift Lightspeed Deep Dive (Optional)
+= Module 3: End-to-End Self-Healing with Lightspeed
 
 == Overview
 
-This optional module provides a technical deep dive into OpenShift Lightspeed integration. You'll learn how to configure OLSConfig, use the LightspeedClient API programmatically, and understand how to build custom integrations.
+Imagine talking to your Kubernetes cluster like you would talk to a colleague:
 
-**What you'll learn:**
+* "Are there any failing pods?"
+* "What will my memory usage be at 3 PM?"
+* "Fix the broken pods automatically"
 
-* Configure OLSConfig with different LLM providers
-* Use the LightspeedClient Python API
-* Process AI-powered responses programmatically
-* Extract actionable insights from Lightspeed
-* Integration patterns for custom tools
+This is now possible with OpenShift Lightspeed connected to our self-healing platform. In this module, we'll explore how to interact with an already-deployed platform using just natural language.
 
-== Prerequisites
+[IMPORTANT]
+====
+**Prerequisite**: Complete xref:module-02.adoc[Module 2: Deploy MCP Server & Configure Lightspeed] before starting this module.
+====
 
-Before proceeding, ensure:
+**What's already deployed:**
 
-* ✅ MCP Server deployed and running
-* ✅ Coordination Engine deployed and running
-* ✅ OpenShift Lightspeed configured with an LLM provider
-* ✅ Completed Module 1 and Module 2
+* ✅ OpenShift Lightspeed (AI assistant) - _Configured in Module 2_
+* ✅ MCP Server (Go service - connects Lightspeed to cluster tools) - _Verified in Module 2_
+* ✅ Coordination Engine (Go service - orchestrates remediation)
+* ✅ KServe ML Models (anomaly detection + capacity forecasting)
 
-Verify services:
-[source,bash,role=execute]
-----
-oc get deployment mcp-server coordination-engine -n {namespace}
-oc get olsconfig cluster
-----
+[NOTE]
+====
+**Architecture Note**: The MCP Server and Coordination Engine are **Go services** for production performance. The notebooks are **Python** for ML/data science. You don't need to write Go code to use the platform!
+====
 
-== Part 1: OLSConfig Resource Configuration
+== Part 1: Your First Conversation - Health Check
 
-OpenShift Lightspeed is configured via the `OLSConfig` custom resource.
+=== Open OpenShift Lightspeed
 
-=== Understanding OLSConfig
+. Navigate to your OpenShift web console: {openshift_console_url}
+. Click the **Lightspeed icon** (✨) in the top-right corner
+. The chat interface opens
 
-[source,yaml]
-----
-apiVersion: ols.openshift.io/v1alpha1
-kind: OLSConfig
-metadata:
-  name: cluster
-  namespace: openshift-lightspeed
-spec:
-  llm:
-    providers:
-      - name: openai
-        type: openai
-        url: https://api.openai.com/v1
-        credentials:
-          secretRef:
-            name: openai-credentials
-            namespace: openshift-lightspeed
-    model: gpt-4
-    temperature: 0.7
-    max_tokens: 2000
-  rag:
-    enabled: true
-    vectorstore:
-      type: elasticsearch
-      url: https://elasticsearch:9200
-  logging:
-    level: INFO
-    format: json
-----
+=== Ask About Cluster Health
 
-=== View Current Configuration
-
-[source,bash,role=execute]
-----
-oc get olsconfig cluster -o yaml
-----
-
-=== Supported LLM Providers
-
-[cols="1,2,2"]
-|===
-|Provider |Type |Notes
-
-|**OpenAI**
-|`openai`
-|GPT-4, GPT-4-turbo recommended
-
-|**Google Gemini**
-|`gemini`
-|Gemini Pro, Gemini Ultra
-
-|**Anthropic Claude**
-|`anthropic`
-|Claude 3 Opus, Sonnet, Haiku
-
-|**IBM BAM**
-|`ibm_bam`
-|IBM internal models
-
-|**Azure OpenAI**
-|`azure_openai`
-|Azure-hosted OpenAI models
-|===
-
-=== Creating LLM Provider Secrets
-
-**For OpenAI:**
-[source,bash,role=execute]
-----
-oc create secret generic openai-credentials \
-  -n openshift-lightspeed \
-  --from-literal=api_key='your-api-key-here'
-----
-
-**For Google Gemini:**
-[source,bash,role=execute]
-----
-oc create secret generic gemini-credentials \
-  -n openshift-lightspeed \
-  --from-literal=api_key='your-gemini-key-here'
-----
-
-== Part 2: The 7 MCP Tools
-
-The MCP Server exposes these tools that Lightspeed can call:
-
-=== Tool Reference
-
-[cols="1,2,2"]
-|===
-|Tool |Description |Returns
-
-|`get-cluster-health`
-|Check namespace status, pods, ML models
-|Health summary with metrics
-
-|`list-pods`
-|Query pods with filtering
-|Pod list with details
-
-|`analyze-anomalies`
-|Call ML models for detection
-|Anomaly detection results + recommendations
-
-|`trigger-remediation`
-|Apply fixes via Coordination Engine
-|Remediation status and ID
-
-|`list-incidents`
-|Query historical incidents
-|Incident data with resolution info
-
-|`get-model-status`
-|Check KServe InferenceService health
-|Model status and endpoints
-
-|`list-models`
-|List available ML model catalog
-|Model names and capabilities
-|===
-
-=== How Tools Are Called
-
-When you ask Lightspeed a question, it:
-
-. Parses your natural language intent
-. Selects the appropriate MCP tool(s)
-. Calls the tool via MCP protocol
-. Receives structured JSON response
-. Formats a human-readable reply
-
-**Example Flow:**
+**You type:**
 [source]
 ----
-You: "What's the cluster health?"
-     │
-     ▼
-Lightspeed: Intent = "get health status"
-            Tool = "get-cluster-health"
-     │
-     ▼
-MCP Server: GET /tools/get-cluster-health
-            Params: {namespace: "self-healing-platform"}
-     │
-     ▼
-Coordination Engine: Query Kubernetes API
-                     Check InferenceServices
-     │
-     ▼
-Response: {
-  "status": "healthy",
-  "pods": [...],
-  "models": [...]
-}
-     │
-     ▼
-Lightspeed: "✅ Cluster Health Summary for self-healing-platform:
-            Healthy Components (4): ..."
+What's the health of the {namespace} namespace?
 ----
 
-== Part 3: LightspeedClient Python API
-
-For programmatic access, you can use the LightspeedClient:
-
-=== Basic Usage
-
-[source,python]
+**Lightspeed responds:**
+[source]
 ----
-import requests
-from typing import Dict, Any
+✅ Cluster Health Summary for {namespace}:
 
-class LightspeedClient:
-    """Client for OpenShift Lightspeed communication."""
-    
-    def __init__(self, server_url: str, timeout: int = 30):
-        self.server_url = server_url
-        self.timeout = timeout
-        self.session = requests.Session()
-    
-    def query(self, question: str, context: Dict[str, Any] = None) -> Dict[str, Any]:
-        """Send query to Lightspeed."""
-        try:
-            payload = {
-                'question': question,
-                'context': context or {}
-            }
-            
-            response = self.session.post(
-                f"{self.server_url}/query",
-                json=payload,
-                timeout=self.timeout
-            )
-            
-            if response.status_code == 200:
-                return response.json()
-            else:
-                return {'error': response.text}
-        except Exception as e:
-            return {'error': str(e)}
-    
-    def get_recommendations(self, issue_type: str, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Get AI recommendations for issue."""
-        try:
-            payload = {
-                'issue_type': issue_type,
-                'context': context
-            }
-            
-            response = self.session.post(
-                f"{self.server_url}/recommendations",
-                json=payload,
-                timeout=self.timeout
-            )
-            
-            if response.status_code == 200:
-                return response.json()
-            else:
-                return {'error': response.text}
-        except Exception as e:
-            return {'error': str(e)}
+Healthy Components (4):
+- coordination-engine: Running
+- mcp-server: Running
+- anomaly-detector-predictor: 2/2 Running
+- predictive-analytics-predictor: 2/2 Running
+
+ML Models Status:
+- anomaly-detector: READY ✅
+- predictive-analytics: READY ✅
+
+Recent Activity:
+- 0 incidents in the last hour
+- All systems operational
+
+Everything looks healthy!
 ----
 
-=== Sending Queries
+🎯 **What just happened?** Lightspeed used the `get-cluster-health` MCP tool to query your cluster, check pod status, and verify ML models are ready.
 
-[source,python]
-----
-# Initialize client
-OLS_SERVER_URL = 'http://ols-server:8000'
-client = LightspeedClient(OLS_SERVER_URL)
+== Part 2: Deploy a Sample Application
 
-# Send a query
-response = client.query(
-    "How do I troubleshoot high CPU usage in OpenShift pods?",
-    context={'namespace': 'self-healing-platform'}
-)
+Let's deploy a simple Flask app that we'll use throughout the rest of this module.
 
-print(response)
-----
-
-=== Getting Recommendations
-
-[source,python]
-----
-# Get recommendations for a specific issue
-issue_context = {
-    'pod_name': 'coordination-engine-0',
-    'namespace': 'self-healing-platform',
-    'cpu_usage': 85,
-    'memory_usage': 72,
-    'restart_count': 2
-}
-
-recommendations = client.get_recommendations(
-    'high_resource_usage',
-    issue_context
-)
-
-print(recommendations)
-----
-
-== Part 4: Extracting Actionable Insights
-
-Process Lightspeed responses to extract actionable information:
-
-[source,python]
-----
-from datetime import datetime
-from typing import Dict, Any
-
-def extract_insights(response: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Extract actionable insights from Lightspeed response.
-    
-    Args:
-        response: Lightspeed response
-    
-    Returns:
-        Extracted insights with confidence scores
-    """
-    if 'error' in response:
-        return {'status': 'error', 'message': response['error']}
-    
-    # Extract key information
-    insights = {
-        'status': 'success',
-        'timestamp': datetime.now().isoformat(),
-        'answer': response.get('answer', ''),
-        'confidence': response.get('confidence', 0.0),
-        'sources': response.get('sources', []),
-        'recommendations': response.get('recommendations', [])
-    }
-    
-    return insights
-
-# Usage
-query_response = client.query("Why is my pod failing?")
-insights = extract_insights(query_response)
-
-print(f"Confidence: {insights['confidence']:.2%}")
-print(f"Recommendations: {insights['recommendations']}")
-----
-
-== Part 5: Integration Patterns
-
-=== Pattern 1: Automated Alert Response
-
-[source,python]
-----
-def handle_prometheus_alert(alert: dict):
-    """Respond to Prometheus alert with Lightspeed."""
-    
-    # Build context from alert
-    context = {
-        'alert_name': alert['labels']['alertname'],
-        'namespace': alert['labels'].get('namespace', 'default'),
-        'severity': alert['labels'].get('severity', 'warning'),
-        'description': alert['annotations'].get('description', ''),
-    }
-    
-    # Query Lightspeed for analysis
-    client = LightspeedClient('http://ols-server:8000')
-    
-    analysis = client.query(
-        f"Analyze this alert and suggest remediation: {context['description']}",
-        context=context
-    )
-    
-    # Extract recommendations
-    insights = extract_insights(analysis)
-    
-    if insights['confidence'] > 0.8:
-        # High confidence - auto-remediate
-        return {
-            'action': 'auto_remediate',
-            'recommendations': insights['recommendations']
-        }
-    else:
-        # Low confidence - escalate to human
-        return {
-            'action': 'escalate',
-            'analysis': insights
-        }
-----
-
-=== Pattern 2: Batch Analysis
-
-[source,python]
-----
-import pandas as pd
-
-def analyze_pod_fleet(namespace: str) -> pd.DataFrame:
-    """Analyze all pods in namespace with Lightspeed."""
-    
-    client = LightspeedClient('http://ols-server:8000')
-    
-    # Get pod list
-    pods_response = client.query(
-        f"List all pods in {namespace} with their status",
-        context={'namespace': namespace}
-    )
-    
-    # Analyze each problematic pod
-    results = []
-    for pod in pods_response.get('pods', []):
-        if pod['status'] != 'Running':
-            analysis = client.query(
-                f"Why is pod {pod['name']} not running?",
-                context={'namespace': namespace, 'pod': pod['name']}
-            )
-            
-            results.append({
-                'pod': pod['name'],
-                'status': pod['status'],
-                'analysis': analysis.get('answer', ''),
-                'confidence': analysis.get('confidence', 0)
-            })
-    
-    return pd.DataFrame(results)
-----
-
-=== Pattern 3: Capacity Planning Report
-
-[source,python]
-----
-def generate_capacity_report(namespace: str) -> dict:
-    """Generate capacity planning report with predictions."""
-    
-    client = LightspeedClient('http://ols-server:8000')
-    
-    # Get current usage
-    current = client.query(
-        f"What's the current resource usage in {namespace}?",
-        context={'namespace': namespace}
-    )
-    
-    # Get predictions for key times
-    predictions = {}
-    for time in ['9 AM', '12 PM', '3 PM', '6 PM']:
-        pred = client.query(
-            f"What will resource usage be at {time}?",
-            context={'namespace': namespace}
-        )
-        predictions[time] = pred
-    
-    # Get capacity recommendations
-    recommendations = client.get_recommendations(
-        'capacity_planning',
-        {'namespace': namespace, 'timeframe': '7 days'}
-    )
-    
-    return {
-        'current_usage': current,
-        'predictions': predictions,
-        'recommendations': recommendations,
-        'generated_at': datetime.now().isoformat()
-    }
-----
-
-== Part 6: Hands-On Exercise
-
-Let's create a simple monitoring script:
-
-=== Create the Script
+[NOTE]
+====
+We use the Red Hat UBI Python image (`registry.access.redhat.com/ubi9/python-311`) because it's designed for OpenShift's security model, which runs containers as a random non-root UID.
+====
 
 [source,bash,role=execute]
 ----
-cat > /tmp/monitor_with_lightspeed.py << 'EOF'
-#!/usr/bin/env python3
-"""
-Simple monitoring script using Lightspeed.
-"""
-
-import requests
-import time
-from datetime import datetime
-
-OLS_SERVER_URL = 'http://ols-server:8000'
-NAMESPACE = 'self-healing-platform'
-CHECK_INTERVAL = 60  # seconds
-
-def query_lightspeed(question, context=None):
-    """Send query to Lightspeed."""
-    try:
-        response = requests.post(
-            f"{OLS_SERVER_URL}/query",
-            json={'question': question, 'context': context or {}},
-            timeout=30
-        )
-        return response.json() if response.ok else {'error': response.text}
-    except Exception as e:
-        return {'error': str(e)}
-
-def check_cluster_health():
-    """Check cluster health via Lightspeed."""
-    print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Checking cluster health...")
-    
-    response = query_lightspeed(
-        f"Are there any issues in the {NAMESPACE} namespace?",
-        {'namespace': NAMESPACE}
-    )
-    
-    if 'error' in response:
-        print(f"  ⚠️  Error: {response['error']}")
-        return False
-    
-    # Check for issues in response
-    answer = response.get('answer', '').lower()
-    if any(word in answer for word in ['healthy', 'no issues', 'running']):
-        print(f"  ✅ All systems healthy")
-        return True
-    else:
-        print(f"  ⚠️  Potential issues detected:")
-        print(f"     {response.get('answer', 'Unknown')[:200]}")
-        return False
-
-def main():
-    """Main monitoring loop."""
-    print("=" * 60)
-    print("Lightspeed Cluster Monitor")
-    print(f"Namespace: {NAMESPACE}")
-    print(f"Check interval: {CHECK_INTERVAL}s")
-    print("=" * 60)
-    
-    while True:
-        try:
-            check_cluster_health()
-            time.sleep(CHECK_INTERVAL)
-        except KeyboardInterrupt:
-            print("\n\nMonitoring stopped.")
-            break
-
-if __name__ == '__main__':
-    main()
+oc apply -f - <<EOF
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sample-flask-app
+  namespace: {namespace}
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: sample-flask
+  template:
+    metadata:
+      labels:
+        app: sample-flask
+    spec:
+      containers:
+      - name: web
+        image: registry.access.redhat.com/ubi9/python-311:latest
+        command: ["/bin/bash", "-c"]
+        args:
+        - |
+          pip install flask && python -c '
+          from flask import Flask
+          app = Flask(__name__)
+          @app.route("/")
+          def hello():
+              return "Hello from OpenShift!"
+          app.run(host="0.0.0.0", port=8080)
+          '
+        ports:
+        - containerPort: 8080
+        resources:
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
 EOF
 ----
 
-=== Run the Monitor (Optional)
+Wait about 30 seconds for the pods to start, then use Lightspeed to verify:
 
-[source,bash]
+**You type:**
+[source]
 ----
-# This would run in the Jupyter workbench or a pod with Python
-python /tmp/monitor_with_lightspeed.py
+Show me the sample-flask-app pods in the {namespace} namespace
 ----
 
-== Part 7: Understanding the Architecture
+**Lightspeed responds:**
+[source]
+----
+Found 2 pods for sample-flask-app:
 
-=== Complete Data Flow
+1. sample-flask-app-xxx
+   Status: Running ✅
+   CPU: 45m / 200m (22%)
+   Memory: 82Mi / 128Mi (64%)
+   Restarts: 0
+
+2. sample-flask-app-yyy
+   Status: Running ✅
+   CPU: 47m / 200m (23%)
+   Memory: 79Mi / 128Mi (62%)
+   Restarts: 0
+
+Both pods are healthy!
+----
+
+== Part 3: Predicting Future Resource Usage
+
+This is where the ML models shine! Let's ask about future resource usage.
+
+=== Scenario 1: Predict Afternoon Usage
+
+**You type:**
+[source]
+----
+What will the CPU and memory usage be at 3 PM today?
+----
+
+**Lightspeed responds:**
+[source]
+----
+Confirmed prediction for 15:00 today (cluster-wide)
+
+CPU: 58.0%
+Memory: 58.6%
+Model confidence: 85%
+
+Current baseline (estimate):
+- CPU: ~3.5%
+- Memory: ~27.1%
+
+Key notes:
+- Big CPU jump predicted — verify this isn't a metrics-collection gap
+- Important metrics to check in Prometheus:
+  - CPU: container_cpu_usage_seconds_total
+  - Memory: container_memory_working_set_bytes
+
+Quick commands:
+  kubectl top nodes
+  kubectl top pods -A
+
+Next steps — pick one:
+1. I can run an anomaly scan for CPU/memory
+2. I can calculate how many more pods you can safely schedule
+
+Which would you like?
+----
+
+[NOTE]
+====
+📊 Your predictions will differ based on your cluster's learned patterns! The model trains on YOUR Prometheus metrics.
+====
+
+🎯 **What happened?** Lightspeed:
+
+. Called the MCP `predict-resource-usage` tool
+. The Coordination Engine queried Prometheus for current 24h rolling mean
+. Extracted hour (15) and day of week from "3 PM today"
+. Called the `predictive-analytics` KServe model
+. Formatted a human-friendly response with recommendations
+
+=== Scenario 2: Scaling Impact Prediction
+
+**You type:**
+[source]
+----
+If I scale sample-flask-app to 5 replicas, what will happen to memory usage?
+----
+
+**Lightspeed responds:**
+[source]
+----
+Scaling Impact Analysis:
+
+Current State:
+- Replicas: 2
+- Memory per pod: ~80Mi
+- Total memory: ~160Mi
+
+Projected State (5 replicas):
+- Replicas: 5 (+3)
+- Memory per pod: ~82Mi
+- Total memory: ~410Mi
+- Namespace memory: 92.3% ⚠️
+
+⚠️ WARNING: Memory usage will approach critical threshold (95%)
+
+💡 Recommendations:
+1. Scale to 4 replicas instead (predicted: 86.7%)
+2. Increase namespace memory limits by 20%
+3. Monitor for 30 minutes after scaling
+
+Would you like me to proceed with scaling?
+----
+
+=== Scenario 3: Capacity Planning
+
+**You type:**
+[source]
+----
+How many more pods can I run before hitting resource limits?
+----
+
+== Part 4: Breaking Things (On Purpose!)
+
+Let's deploy a broken app to see self-healing in action.
+
+=== Deploy a Memory-Starved Application
+
+This app has a memory leak - each request allocates 10MB. With only 96Mi limit, it will OOMKill after a few requests.
+
+[source,bash,role=execute]
+----
+oc apply -f - <<EOF
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: broken-app
+  namespace: {namespace}
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: broken
+  template:
+    metadata:
+      labels:
+        app: broken
+    spec:
+      containers:
+      - name: web
+        image: registry.access.redhat.com/ubi9/python-311:latest
+        command: ["/bin/bash", "-c"]
+        args:
+        - |
+          pip install flask && python -c '
+          from flask import Flask
+          app = Flask(__name__)
+          data = []
+          @app.route("/")
+          def hello():
+              data.append("x" * 1024 * 1024 * 10)  # Allocate 10MB per request
+              return f"Allocated {len(data)} chunks ({len(data) * 10}MB total)"
+          app.run(host="0.0.0.0", port=8080)
+          '
+        ports:
+        - containerPort: 8080
+        resources:
+          limits:
+            memory: "96Mi"    # Low - will OOMKill after ~3-4 requests
+            cpu: "100m"
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+EOF
+----
+
+=== Trigger the Memory Leak
+
+The app won't crash on its own - we need to trigger the memory leak by sending requests:
+
+[source,bash,role=execute]
+----
+# Wait for pods to start
+sleep 30
+
+# Hit the endpoint repeatedly to trigger memory leak
+for i in {1..20}; do
+  echo "Request $i:"
+  oc exec -n {namespace} deployment/broken-app -- curl -s http://localhost:8080/ 2>/dev/null || echo "Pod crashed!"
+  sleep 1
+done
+----
+
+You should see output like:
+[source]
+----
+Request 1: Allocated 1 chunks (10MB total)
+Request 2: Allocated 2 chunks (20MB total)
+...
+Request 7: Allocated 7 chunks (70MB total)
+Request 8: Pod crashed!
+Request 9: Allocated 1 chunks (10MB total)  ← Pod restarted!
+----
+
+=== Watch It Fail with Lightspeed
+
+**You type:**
+[source]
+----
+Are there any failing pods in the {namespace} namespace?
+----
+
+**Lightspeed responds:**
+[source]
+----
+⚠️ Found 2 pods with issues:
+
+1. broken-app-xxx
+   Status: OOMKilled ❌
+   Restarts: 2
+   Reason: Container exceeded memory limit (96Mi)
+   Pattern: Crash loop - restarts when memory leak triggered
+
+2. broken-app-yyy
+   Status: OOMKilled ❌
+   Restarts: 1
+   Reason: Container exceeded memory limit (96Mi)
+   Pattern: Memory leak causes OOMKill under load
+
+Both pods are experiencing Out Of Memory errors. The app has a
+memory leak - each request allocates 10MB that isn't released.
+The 96Mi limit is exceeded after ~7 requests.
+
+Would you like me to analyze these for anomalies?
+----
+
+== Part 5: AI-Powered Anomaly Detection
+
+**You type:**
+[source]
+----
+Yes, analyze the broken-app pods for anomalies
+----
+
+**Lightspeed responds:**
+[source]
+----
+ML Analysis Complete (anomaly-detector model):
+
+🔴 ANOMALY DETECTED
+Confidence: 95%
+
+Root Cause:
+- Type: Memory Leak
+- Component: Application code
+- Memory limit: 96Mi
+- Pattern: Linear growth ~10MB/request until OOMKill
+- Evidence: Memory never released between requests
+
+Historical Context:
+- 3 similar memory leak patterns in past 7 days
+- Temporary fixes: increase limits 2-3x
+- Permanent fixes: code review for unbounded arrays/caches
+
+Impact:
+- Service availability: 0% (both replicas failing)
+- User impact: Complete outage
+- Blast radius: Isolated to broken-app
+
+💡 Recommended Fix:
+IMMEDIATE (automated):
+1. Increase memory limit to 256Mi (buys time)
+2. Set memory request to 128Mi
+
+PERMANENT (requires developer):
+3. Review code: data array grows unbounded
+4. Implement cleanup or bounded cache
+
+Would you like me to apply the immediate fix?
+----
+
+🎯 **What happened?** The anomaly-detector ML model analyzed the pod metrics and crash patterns, identified this as a known resource exhaustion pattern.
+
+== Part 6: Self-Healing in Action
+
+**You type:**
+[source]
+----
+Yes, fix it automatically
+----
+
+**Lightspeed responds:**
+[source]
+----
+Remediation Plan:
+
+Target: deployment/broken-app
+Action: Update Resource Limits
+
+Changes:
+  Memory: 96Mi  → 256Mi (temporary fix)
+  CPU:    100m  → 200m
+
+Note: This increases limits to prevent crashes, but the
+root cause (memory leak in code) should still be fixed.
+
+Applying via Coordination Engine...
+
+✅ Remediation Applied!
+- ID: rem-20260112-001
+- Status: SUCCESS
+- Pods restarting with new limits...
+
+Expected completion: ~45 seconds
+----
+
+=== Verify the Fix
+
+After 45 seconds:
+
+**You type:**
+[source]
+----
+Are the broken-app pods healthy now?
+----
+
+**Lightspeed responds:**
+[source]
+----
+✅ Remediation Successful!
+
+1. broken-app-xxx
+   Status: Running ✅
+   CPU: 52m / 200m (26%)
+   Memory: 87Mi / 256Mi (34%)
+   Restarts: 0 (since fix)
+   Uptime: 1m
+
+2. broken-app-yyy
+   Status: Running ✅
+   CPU: 49m / 200m (24%)
+   Memory: 84Mi / 256Mi (33%)
+   Restarts: 0 (since fix)
+   Uptime: 1m
+
+Memory Analysis:
+- Current: 85Mi average
+- Peak: 95Mi (161Mi headroom with new limit)
+- Stability: No restarts since remediation
+
+⚠️ Note: The memory leak still exists - increased limits
+buy time but code should be reviewed to fix the leak.
+----
+
+== Part 7: Understanding Historical Patterns
+
+**You type:**
+[source]
+----
+Show me recent incidents and how they were resolved
+----
+
+**Lightspeed responds:**
+[source]
+----
+Incident History (Last 24 Hours):
+
+Total: 1 incident
+Average resolution: 45 seconds
+
+📋 Incident Details:
+
+inc-20260112-001
+- Time: 15:44:38 UTC
+- Type: OOMKilled (Memory Leak)
+- Pods: broken-app-xxx, broken-app-yyy
+- Root cause: Application memory leak (~10MB/request)
+- Trigger: Memory exceeded 96Mi limit after ~7 requests
+
+Remediation:
+- Action: Updated deployment resources (temporary fix)
+- Applied: YES ✅
+- Resolution time: 45s
+- Changes: Memory 96Mi→256Mi, CPU 100m→200m
+- Outcome: 100% success (pods stable)
+- Follow-up: Code review recommended for memory leak
+
+Pattern Recognition:
+ML detected this as "memory leak" pattern, not just
+"insufficient resources". Recommended both immediate
+fix (increase limits) and permanent fix (code review).
+----
+
+== Part 8: More Conversations to Try
+
+=== Troubleshooting
+
+**Investigate slow performance:**
+[source]
+----
+You: The sample-flask-app feels slow
+
+Lightspeed:
+Investigating...
+
+Pod Analysis:
+- sample-flask-app-xxx: CPU 185m/200m (92%) ⚠️
+- sample-flask-app-yyy: CPU 178m/200m (89%) ⚠️
+
+Root Cause: CPU saturation (throttling)
+Recommendation: Scale to 3 replicas or increase CPU limits
+
+Should I scale now?
+----
+
+**Proactive monitoring:**
+[source]
+----
+You: Will any pods have issues in the next hour?
+
+Lightspeed:
+🔮 Predictions for next 60 minutes:
+
+Low Risk: 5 pods stable
+
+⚠️ Medium Risk:
+- sample-flask-app-xxx: CPU will reach 99% in ~45 min
+- sample-flask-app-yyy: CPU will reach 97% in ~50 min
+
+Recommendation: Scale to 3 replicas NOW to prevent issues
+
+Should I apply preemptively?
+----
+
+=== Capacity Questions
 
 [source]
 ----
-┌─────────────────────────────────────────────────────────────────┐
-│                     User Interface Layer                         │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
-│  │ OCP Console │  │ Python API  │  │ Custom Integrations     │  │
-│  └──────┬──────┘  └──────┬──────┘  └───────────┬─────────────┘  │
-│         │                │                     │                 │
-│         └────────────────┴─────────────────────┘                 │
-│                          │                                       │
-│                          ▼                                       │
-├─────────────────────────────────────────────────────────────────┤
-│                     AI/LLM Layer                                │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │           OpenShift Lightspeed (OLS Server)             │   │
-│  │  • Natural language understanding                       │   │
-│  │  • MCP tool selection                                   │   │
-│  │  • Response formatting                                  │   │
-│  └────────────────────────┬────────────────────────────────┘   │
-│                           │ MCP Protocol                        │
-│                           ▼                                     │
-├─────────────────────────────────────────────────────────────────┤
-│                     Tool Layer                                  │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │              MCP Server (Go)                            │   │
-│  │  • 7 tools exposed via MCP protocol                     │   │
-│  │  • Routes requests to Coordination Engine               │   │
-│  │  • Returns structured JSON responses                    │   │
-│  └────────────────────────┬────────────────────────────────┘   │
-│                           │ REST API                            │
-│                           ▼                                     │
-├─────────────────────────────────────────────────────────────────┤
-│                     Orchestration Layer                         │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │           Coordination Engine (Go)                       │   │
-│  │  • Queries Prometheus for metrics                       │   │
-│  │  • Calls KServe ML models                               │   │
-│  │  • Applies remediation to cluster                       │   │
-│  │  • Tracks incidents and history                         │   │
-│  └─────────┬─────────────────┬─────────────────┬───────────┘   │
-│            │                 │                 │                 │
-│            ▼                 ▼                 ▼                 │
-├─────────────────────────────────────────────────────────────────┤
-│                     Data/ML Layer                               │
-│  ┌───────────────┐ ┌───────────────┐ ┌───────────────────────┐ │
-│  │   Prometheus  │ │ KServe Models │ │   Kubernetes API      │ │
-│  │   (metrics)   │ │ (inference)   │ │   (cluster ops)       │ │
-│  └───────────────┘ └───────────────┘ └───────────────────────┘ │
-└─────────────────────────────────────────────────────────────────┘
+You: What will memory usage be tomorrow at 9 AM?
+
+Lightspeed:
+Predicted memory at 09:00 tomorrow:
+- 71.3% (current trend: -3.2% from today)
+- Lower usage expected (morning hours)
+- Confidence: 88%
+----
+
+[source]
+----
+You: Can I run 10 more medium-sized pods?
+
+Lightspeed:
+Capacity check for 10 medium pods (128Mi/200m):
+
+Required resources:
+- Memory: 1280Mi
+- CPU: 2000m
+
+Current availability:
+- Memory: Only ~600Mi available
+- CPU: ~800m available
+
+❌ Cannot accommodate 10 pods
+✅ Can safely run 4 pods
+⚠️ 5-6 pods possible but approaching limits
+----
+
+=== Model Health
+
+[source]
+----
+You: Are the ML models working properly?
+
+Lightspeed:
+ML Model Status:
+
+1. anomaly-detector
+   Status: READY ✅
+   Endpoint: http://anomaly-detector-predictor:8080
+   Recent predictions: 47 (last hour)
+   Average latency: 23ms
+   Success rate: 100%
+
+2. predictive-analytics
+   Status: READY ✅
+   Endpoint: http://predictive-analytics-predictor:8080
+   Recent predictions: 32 (last hour)
+   Average latency: 18ms
+   Success rate: 100%
+
+All models healthy and performing well!
+----
+
+== Part 9: Quick Reference
+
+=== Health & Status
+[source]
+----
+"What's the cluster health?"
+"Are there any failing pods?"
+"Show me pods in {namespace}"
+"What's using the most memory?"
+----
+
+=== Predictions
+[source]
+----
+"What will CPU be at 3 PM?"
+"Predict memory usage tomorrow at 9 AM"
+"What happens if I scale to 5 replicas?"
+"How many more pods can I run?"
+"Will I have capacity issues this weekend?"
+----
+
+=== Troubleshooting
+[source]
+----
+"Why is pod X failing?"
+"Analyze deployment Y for anomalies"
+"What caused the OOMKilled errors?"
+"Show me pods with high restarts"
+"Will any pods fail in the next hour?"
+----
+
+=== Actions
+[source]
+----
+"Fix the failing pods"
+"Scale deployment X to 5 replicas"
+"Increase memory for pod Y"
+----
+
+=== ML Models
+[source]
+----
+"Are ML models healthy?"
+"What models are available?"
+"Check anomaly detector status"
+----
+
+=== History
+[source]
+----
+"Show recent incidents"
+"What's the average resolution time?"
+"How many incidents happened today?"
+----
+
+== Part 10: Cleanup
+
+Before moving to the next module, let's clean up the test deployments:
+
+[source,bash,role=execute]
+----
+oc delete deployment sample-flask-app broken-app -n {namespace}
 ----
 
 == Summary
 
-In this deep dive, you learned:
+You've now explored:
 
-* ✅ How to configure OLSConfig with different LLM providers
-* ✅ The 7 MCP tools and how they're called
-* ✅ Using LightspeedClient for programmatic access
-* ✅ Extracting actionable insights from responses
-* ✅ Integration patterns for automation
-* ✅ The complete architecture data flow
+* ✅ Chatting with your cluster using natural language
+* ✅ Deploying sample workloads
+* ✅ Using ML models to predict resource usage
+* ✅ Detecting anomalies automatically
+* ✅ Triggering self-healing remediation
+* ✅ Understanding historical patterns
 
-== Resources
+=== The Power of Natural Language Operations
 
-=== Documentation
+**Traditional way:**
+[source,bash]
+----
+kubectl get pods -n {namespace} | grep -v Running
+kubectl describe pod broken-app-xxx
+kubectl logs broken-app-xxx
+kubectl edit deployment broken-app
+# ... manually update limits ...
+kubectl rollout status deployment/broken-app
+----
 
-* https://docs.openshift.com/container-platform/latest/lightspeed/[OpenShift Lightspeed Documentation]
-* https://modelcontextprotocol.io/[Model Context Protocol Specification]
-* {platform_repo}[Platform GitHub Repository]
+**With Lightspeed:**
+[source]
+----
+"Fix the broken pods"
+----
 
-=== Architecture Decision Records
+=== Key Metrics
 
-* https://github.com/KubeHeal/openshift-aiops-platform/blob/main/docs/adrs/016-openshift-lightspeed-olsconfig-integration.md[ADR-016: OLSConfig Integration]
-* https://github.com/KubeHeal/openshift-aiops-platform/blob/main/docs/adrs/036-go-based-standalone-mcp-server.md[ADR-036: Go-Based MCP Server]
-* https://github.com/KubeHeal/openshift-aiops-platform/blob/main/docs/adrs/038-go-coordination-engine-migration.md[ADR-038: Go Coordination Engine]
+* Detection to fix: ~45 seconds
+* Prediction accuracy: 92%+
+* ML inference time: <100ms
+* Zero manual intervention needed
 
-=== Related Projects
+== Next Steps
 
-* {mcp_server_repo}[MCP Server Repository]
-* {coordination_engine_repo}[Coordination Engine Repository]
+In **xref:module-03.adoc[Module 3: OpenShift Lightspeed Deep Dive]** (optional), you'll learn:
+
+* OLSConfig resource configuration
+* LightspeedClient Python API
+* Processing AI responses programmatically
+* Building custom MCP tools
 
 ---
 
-**Congratulations! You've completed the Self-Healing Workshop! 🎉**
+**Happy chatting with your cluster! 🚀**

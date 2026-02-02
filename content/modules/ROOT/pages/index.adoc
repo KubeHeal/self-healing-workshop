@@ -21,13 +21,16 @@ In this hands-on workshop, you'll learn how to leverage AI-powered self-healing 
 |**ML Model Training with Tekton** - Train anomaly detection and predictive analytics models using automated pipelines
 
 |*Module 2*
-|**End-to-End Self-Healing** - Chat with your cluster using OpenShift Lightspeed, deploy apps, break things, and watch AI fix them
+|**Deploy MCP Server & Configure Lightspeed** - Set up the MCP Server and connect OpenShift Lightspeed to your platform _(Required)_
 
 |*Module 3*
-|**Lightspeed Deep Dive** - Technical details on OLSConfig, MCP integration, and building custom tools
+|**End-to-End Self-Healing** - Chat with your cluster using Lightspeed, deploy apps, break things, and watch AI fix them
 
 |*Module 4*
-|**Extra Credit** - Advanced ML techniques (LSTM, ensemble) and deploying your own custom models
+|**Extra Credit - Advanced ML** - LSTM networks, ensemble methods, and deploying your own custom models
+
+|*Module 5*
+|**Notebook Catalog & Use Cases** - Comprehensive guide to 33+ notebooks covering all platform capabilities
 |===
 
 == What's Already Deployed
@@ -98,19 +101,23 @@ Your instructor will provide the following credentials:
 |ML training pipelines
 
 |Module 2
-|45 min
-|Interactive self-healing demo
+|20 min
+|MCP Server & Lightspeed setup _(Required)_
 
 |Module 3
-|20 min
-|Optional deep dive
+|45 min
+|Interactive self-healing demo
 
 |Module 4
 |45+ min
 |Extra credit (Jupyter notebooks)
+
+|Module 5
+|30 min
+|Notebook catalog reference
 |===
 
-**Total**: ~2 hours core (add 45+ min for extra credit)
+**Total**: ~2.5 hours core (add 75+ min for extra credit and catalog)
 
 == Getting Help
 

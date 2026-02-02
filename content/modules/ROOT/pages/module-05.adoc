@@ -1,0 +1,454 @@
+= Module 5: Notebook Catalog & Use Cases
+
+== Overview
+
+The OpenShift AI Ops Platform includes **33+ Jupyter notebooks** covering every aspect of the self-healing pipeline. This module provides a comprehensive catalog of all notebooks, organized by use case.
+
+**Purpose of this module:**
+
+* Understand what each notebook category does
+* Learn when to use which notebook
+* Explore notebooks not covered in the main workshop
+* Find the right notebook for your specific use case
+
+== Accessing Notebooks
+
+=== Via OpenShift AI Dashboard
+
+. Open the OpenShift Console: {openshift_console_url}
+. Navigate to **Applications** → **Red Hat OpenShift AI**
+. Click **Data Science Projects** → `{namespace}`
+. Click **Workbenches** → **self-healing-workbench** → **Open**
+
+=== Via Direct URL
+
+[source]
+----
+{jupyter_url}
+----
+
+=== Via CLI Port Forward
+
+[source,bash,role=execute]
+----
+oc port-forward self-healing-workbench-0 8888:8888 -n {namespace}
+# Open http://localhost:8888
+----
+
+== Category 00: Setup & Validation
+
+[cols="2,3,1"]
+|===
+|Notebook |Purpose |When to Use
+
+|`00-platform-readiness-validation.ipynb`
+|Validates cluster prerequisites, operators, GPU availability, storage
+|**First notebook to run** - before any other work
+
+|`01-kserve-model-onboarding.ipynb`
+|Step-by-step guide to deploying a model to KServe
+|When adding a new model to the platform
+
+|`environment-setup.ipynb`
+|Configures Python environment, installs packages
+|When setting up a new workbench
+|===
+
+**Key Concepts:**
+
+* Platform readiness validation ensures all operators and storage are configured
+* KServe onboarding covers model formats (joblib, ONNX, TensorFlow)
+* Environment setup is idempotent - safe to run multiple times
+
+== Category 01: Data Collection
+
+[cols="2,3,1"]
+|===
+|Notebook |Purpose |When to Use
+
+|`prometheus-metrics-collection.ipynb`
+|Queries Prometheus for CPU, memory, network metrics
+|Building training datasets for ML models
+
+|`openshift-events-analysis.ipynb`
+|Extracts Kubernetes events (pod crashes, scaling, failures)
+|Correlating events with anomalies
+
+|`log-parsing-analysis.ipynb`
+|Parses container logs, extracts error patterns
+|Root cause analysis workflows
+
+|`feature-store-demo.ipynb`
+|Demonstrates feature engineering for ML
+|Preparing data for model training
+
+|`synthetic-anomaly-generation.ipynb`
+|Generates synthetic anomalies for testing
+|Testing anomaly detection without breaking production
+|===
+
+**Use Case: Building a Training Dataset**
+
+[source]
+----
+1. prometheus-metrics-collection.ipynb  →  Collect 7 days of metrics
+2. openshift-events-analysis.ipynb      →  Extract failure events
+3. feature-store-demo.ipynb             →  Engineer features
+4. synthetic-anomaly-generation.ipynb   →  Add labeled anomalies
+----
+
+== Category 02: Anomaly Detection
+
+[cols="2,3,1"]
+|===
+|Notebook |Purpose |When to Use
+
+|`01-isolation-forest-implementation.ipynb`
+|Implements Isolation Forest for point anomaly detection
+|General-purpose anomaly detection (fast, explainable)
+
+|`02-time-series-anomaly-detection.ipynb`
+|Time series methods (ARIMA, Prophet-style)
+|Detecting anomalies in metric trends
+
+|`03-lstm-based-prediction.ipynb`
+|LSTM neural network for sequence prediction
+|Complex temporal patterns (requires GPU)
+
+|`04-ensemble-anomaly-methods.ipynb`
+|Combines multiple algorithms via voting
+|High-precision detection (reduces false positives)
+
+|`05-predictive-analytics-kserve.ipynb`
+|Deploys prediction model to KServe
+|Making models available for real-time inference
+|===
+
+**Algorithm Selection Guide:**
+
+[cols="1,2,2"]
+|===
+|Scenario |Recommended Notebook |Why
+
+|Quick start, simple anomalies
+|`01-isolation-forest-implementation.ipynb`
+|Fast training, no GPU needed, explainable
+
+|Time-based patterns (daily cycles)
+|`02-time-series-anomaly-detection.ipynb`
+|Captures seasonality and trends
+
+|Complex multi-variate patterns
+|`03-lstm-based-prediction.ipynb`
+|Deep learning captures complex relationships
+
+|Production deployment
+|`04-ensemble-anomaly-methods.ipynb`
+|Combines models for robust detection
+|===
+
+== Category 03: Self-Healing Logic
+
+[cols="2,3,1"]
+|===
+|Notebook |Purpose |When to Use
+
+|`rule-based-remediation.ipynb`
+|Implements deterministic remediation rules
+|Known issues with known fixes
+
+|`ai-driven-decision-making.ipynb`
+|ML-based action selection
+|Novel issues requiring intelligent decisions
+
+|`hybrid-healing-workflows.ipynb`
+|Combines rules + AI for complete workflows
+|Production self-healing pipelines
+|===
+
+**The Hybrid Approach:**
+
+[source]
+----
+Incoming Anomaly
+      │
+      ▼
+┌──────────────────┐
+│  Rule Matcher    │───→ Known Issue? ───→ Apply Rule-Based Fix
+│  (Deterministic) │                              │
+└──────────────────┘                              │
+      │ No Match                                  │
+      ▼                                           │
+┌──────────────────┐                              │
+│  AI Decision     │───→ Novel Issue? ───→ AI-Recommended Fix
+│  (ML-Based)      │                              │
+└──────────────────┘                              │
+      │                                           │
+      └───────────────────────────────────────────┘
+                        │
+                        ▼
+              Coordination Engine
+              (Conflict Resolution)
+----
+
+== Category 04: Model Serving
+
+[cols="2,3,1"]
+|===
+|Notebook |Purpose |When to Use
+
+|`kserve-model-deployment.ipynb`
+|Full KServe deployment workflow
+|Deploying trained models to production
+
+|`inference-pipeline-setup.ipynb`
+|Creates inference pipelines with pre/post processing
+|Complex inference workflows
+
+|`model-versioning-mlops.ipynb`
+|Implements model versioning, A/B testing
+|Production MLOps practices
+|===
+
+**Deployment Workflow:**
+
+[source,bash]
+----
+# Train model (from 02-anomaly-detection)
+python notebooks/02-anomaly-detection/01-isolation-forest-implementation.ipynb
+
+# Deploy to KServe
+python notebooks/04-model-serving/kserve-model-deployment.ipynb
+
+# Set up versioning
+python notebooks/04-model-serving/model-versioning-mlops.ipynb
+----
+
+== Category 05: End-to-End Scenarios
+
+[cols="2,3,1"]
+|===
+|Notebook |Purpose |When to Use
+
+|`complete-platform-demo.ipynb`
+|Full platform demonstration
+|Demos, presentations, learning
+
+|`pod-crash-loop-healing.ipynb`
+|Detects and remediates CrashLoopBackOff
+|Specific use case: pod failures
+
+|`resource-exhaustion-detection.ipynb`
+|Detects CPU/memory pressure before OOM
+|Specific use case: resource issues
+
+|`network-anomaly-response.ipynb`
+|Detects and responds to network anomalies
+|Specific use case: network issues
+|===
+
+**Scenario Selection:**
+
+* **Demos**: Start with `complete-platform-demo.ipynb`
+* **Learning**: Work through each scenario notebook
+* **Production**: Use scenarios as templates for your specific needs
+
+== Category 06: MCP & Lightspeed Integration
+
+[cols="2,3,1"]
+|===
+|Notebook |Purpose |When to Use
+
+|`mcp-server-integration.ipynb`
+|Tests MCP server functionality
+|Debugging MCP issues
+
+|`openshift-lightspeed-integration.ipynb`
+|Demonstrates Lightspeed API usage
+|Programmatic Lightspeed access
+
+|`llamastack-integration.ipynb`
+|Integrates with LlamaStack for local LLMs
+|Running with local models (no cloud API)
+
+|`end-to-end-troubleshooting-workflow.ipynb`
+|Complete troubleshooting workflow via AI
+|Advanced AI-assisted debugging
+|===
+
+**When to use each:**
+
+* **mcp-server-integration.ipynb**: MCP tools not working? Start here
+* **openshift-lightspeed-integration.ipynb**: Want Python API access? Use this
+* **llamastack-integration.ipynb**: Air-gapped environment? Use local LLMs
+* **end-to-end-troubleshooting-workflow.ipynb**: Complex issues? AI-guided resolution
+
+== Category 07: Monitoring & Operations
+
+[cols="2,3,1"]
+|===
+|Notebook |Purpose |When to Use
+
+|`prometheus-metrics-monitoring.ipynb`
+|Sets up custom Prometheus metrics
+|Adding platform observability
+
+|`model-performance-monitoring.ipynb`
+|Tracks model accuracy, drift detection
+|Production ML monitoring
+
+|`healing-success-tracking.ipynb`
+|Measures self-healing effectiveness
+|Reporting and continuous improvement
+|===
+
+**Operational Metrics:**
+
+* **Model Performance**: Accuracy, latency, throughput
+* **Healing Success**: MTTR, success rate, false positive rate
+* **Platform Health**: Pod restarts, resource usage, error rates
+
+== Category 08: Advanced Scenarios
+
+[cols="2,3,1"]
+|===
+|Notebook |Purpose |When to Use
+
+|`security-incident-response-automation.ipynb`
+|Automates security incident detection and response
+|Security operations teams
+
+|`predictive-scaling-capacity-planning.ipynb`
+|Predicts future capacity needs
+|Capacity planning and cost optimization
+
+|`cost-optimization-resource-efficiency.ipynb`
+|Identifies resource waste, right-sizing
+|FinOps and efficiency improvements
+|===
+
+**Advanced Use Cases:**
+
+* **Security Teams**: Automate detection of suspicious activity, unauthorized access
+* **Platform Teams**: Predict scaling needs before peak load
+* **FinOps Teams**: Identify over-provisioned resources, optimize costs
+
+== Quick Reference: Finding the Right Notebook
+
+[cols="2,3"]
+|===
+|I want to... |Use this notebook
+
+|Validate my cluster is ready
+|`00-setup/00-platform-readiness-validation.ipynb`
+
+|Collect metrics for training
+|`01-data-collection/prometheus-metrics-collection.ipynb`
+
+|Build a quick anomaly detector
+|`02-anomaly-detection/01-isolation-forest-implementation.ipynb`
+
+|Deploy a model to production
+|`04-model-serving/kserve-model-deployment.ipynb`
+
+|See a complete demo
+|`05-end-to-end-scenarios/complete-platform-demo.ipynb`
+
+|Debug Lightspeed issues
+|`06-mcp-lightspeed-integration/mcp-server-integration.ipynb`
+
+|Monitor model performance
+|`07-monitoring-operations/model-performance-monitoring.ipynb`
+
+|Plan for future capacity
+|`08-advanced-scenarios/predictive-scaling-capacity-planning.ipynb`
+|===
+
+== Notebook Development Tips
+
+=== Running Notebooks
+
+[source,bash]
+----
+# Run interactively in JupyterLab
+# Open the notebook and click "Run All"
+
+# Run from command line
+jupyter nbconvert --to notebook --execute notebook.ipynb --output output.ipynb
+
+# Run via NotebookValidationJob (automated)
+oc apply -f - <<EOF
+apiVersion: notebooks.kubeflow.org/v1alpha1
+kind: NotebookValidationJob
+metadata:
+  name: run-anomaly-detection
+spec:
+  notebookPath: /opt/app-root/src/notebooks/02-anomaly-detection/01-isolation-forest-implementation.ipynb
+EOF
+----
+
+=== Modifying Notebooks
+
+. Open in JupyterLab
+. Modify cells as needed
+. Test by running all cells
+. Clear outputs before committing: `jupyter nbconvert --ClearOutputPreprocessor.enabled=True --inplace notebook.ipynb`
+
+=== Creating New Notebooks
+
+Follow the standard structure:
+
+[source,python]
+----
+# ============================================================
+# HEADER SECTION
+# ============================================================
+# Title: [Descriptive Title]
+# Purpose: [What this notebook does]
+# Prerequisites: [Required setup]
+# Expected Outcomes: [What you'll achieve]
+
+# ============================================================
+# SETUP SECTION
+# ============================================================
+import sys
+sys.path.append('../utils')
+from common_functions import setup_environment
+env = setup_environment()
+
+# ============================================================
+# IMPLEMENTATION SECTION
+# ============================================================
+# Your code here...
+
+# ============================================================
+# VALIDATION SECTION
+# ============================================================
+# Verify results...
+
+# ============================================================
+# CLEANUP SECTION
+# ============================================================
+# Resource cleanup...
+----
+
+== Summary
+
+In this module, you explored:
+
+* ✅ **8 Notebook Categories** - From setup to advanced scenarios
+* ✅ **33+ Notebooks** - Complete catalog with use cases
+* ✅ **Quick Reference** - Finding the right notebook for your task
+* ✅ **Development Tips** - Running, modifying, creating notebooks
+
+== Resources
+
+* {platform_repo}[Platform GitHub Repository]
+* {platform_repo}/blob/main/notebooks/README.md[Notebooks README]
+* {platform_repo}/blob/main/AGENTS.md[Platform Development Guide]
+
+---
+
+**Congratulations! You've completed the Self-Healing Workshop! 🎉**
+
+You now understand the complete OpenShift AI Ops Self-Healing Platform and can explore any notebook for your specific use case.
