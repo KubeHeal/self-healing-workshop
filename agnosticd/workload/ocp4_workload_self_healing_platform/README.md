@@ -19,6 +19,23 @@ This workload deploys the complete Self-Healing Platform including:
 - Cluster admin access
 - Storage class available (ODF recommended)
 
+## Execution Environment
+
+This workload uses a **pre-built execution environment** image that contains all required Ansible collections and dependencies:
+
+```
+quay.io/takinosh/openshift-aiops-platform-ee:latest
+```
+
+The image is automatically built by GitHub Actions when the EE definition changes:
+- **Source**: [openshift-aiops-platform](https://github.com/KubeHeal/openshift-aiops-platform)
+- **Workflow**: `.github/workflows/build-ee.yml`
+
+**Benefits**:
+- No Ansible Hub token required
+- Faster deployments (pre-built image)
+- Consistent environment across deployments
+
 ## Usage
 
 ### Variables File
@@ -70,6 +87,7 @@ cd ~/agnosticd-v2
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `self_healing_platform_ee_image` | `quay.io/takinosh/openshift-aiops-platform-ee:latest` | Pre-built execution environment image |
 | `self_healing_platform_namespace` | `self-healing-platform` | Target namespace |
 | `self_healing_platform_git_repo` | `https://github.com/KubeHeal/openshift-aiops-platform.git` | Platform repository |
 | `self_healing_platform_git_ref` | `main` | Git branch/tag |

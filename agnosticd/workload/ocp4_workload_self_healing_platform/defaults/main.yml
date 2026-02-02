@@ -5,6 +5,15 @@
 # These can be overridden in the AgnosticD vars file
 
 # ============================================================
+# Execution Environment Configuration
+# ============================================================
+
+# Pre-built execution environment image (no local build required)
+# This image is automatically built and pushed by GitHub Actions
+# See: https://github.com/KubeHeal/openshift-aiops-platform/actions/workflows/build-ee.yml
+self_healing_platform_ee_image: "quay.io/takinosh/openshift-aiops-platform-ee:latest"
+
+# ============================================================
 # Platform Configuration
 # ============================================================
 
