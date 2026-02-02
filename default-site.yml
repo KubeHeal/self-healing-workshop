@@ -2,7 +2,7 @@
 site:
   title: Self-Healing Workshop
   url: https://github.com/KubeHeal/self-healing-workshop
-  start_page: modules:ROOT:index.adoc
+  start_page: modules::index.adoc
 
 content:
   sources:

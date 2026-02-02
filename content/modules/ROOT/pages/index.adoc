@@ -25,6 +25,9 @@ In this hands-on workshop, you'll learn how to leverage AI-powered self-healing 
 
 |*Module 3*
 |**Lightspeed Deep Dive** - Technical details on OLSConfig, MCP integration, and building custom tools
+
+|*Module 4*
+|**Extra Credit** - Advanced ML techniques (LSTM, ensemble) and deploying your own custom models
 |===
 
 == What's Already Deployed
@@ -101,9 +104,13 @@ Your instructor will provide the following credentials:
 |Module 3
 |20 min
 |Optional deep dive
+
+|Module 4
+|45+ min
+|Extra credit (Jupyter notebooks)
 |===
 
-**Total**: ~2 hours (1.5 hours without Module 3)
+**Total**: ~2 hours core (add 45+ min for extra credit)
 
 == Getting Help
 

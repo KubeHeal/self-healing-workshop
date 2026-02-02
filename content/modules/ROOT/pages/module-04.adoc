@@ -1,0 +1,352 @@
+= Module 4: Extra Credit - Advanced ML & Custom Models
+
+== Overview
+
+Congratulations on completing the core workshop! 🎉
+
+This extra credit module is for participants who want to go deeper into the ML capabilities of the platform. You'll work directly in the **OpenShift AI Jupyter environment** with hands-on notebooks.
+
+**What you'll explore:**
+
+* Advanced ML techniques: LSTM neural networks, ensemble methods
+* Building and deploying your own custom anomaly detection models
+* MLOps best practices for model versioning and lifecycle management
+
+[NOTE]
+====
+This module requires access to the Jupyter Workbench. Ensure you can access:
+
+* OpenShift AI Dashboard
+* Jupyter Notebook environment in `{namespace}`
+====
+
+== Accessing the Jupyter Environment
+
+=== Option 1: Via OpenShift AI Dashboard
+
+. Open the OpenShift Console: {openshift_console_url}
+. Navigate to **Applications** → **Red Hat OpenShift AI**
+. Click **Data Science Projects**
+. Select `{namespace}` project
+. Click **Workbenches** → **self-healing-workbench**
+. Click **Open** to launch JupyterLab
+
+=== Option 2: Direct URL
+
+Access the workbench directly at:
+
+[source]
+----
+{jupyter_url}
+----
+
+=== Option 3: Port Forward (CLI)
+
+[source,bash,role=execute]
+----
+oc port-forward self-healing-workbench-0 8888:8888 -n {namespace}
+# Open http://localhost:8888
+----
+
+== Part 1: Advanced ML Techniques
+
+=== Exercise 1.1: LSTM Neural Networks
+
+**Notebook**: `notebooks/02-anomaly-detection/03-lstm-based-prediction.ipynb`
+
+LSTM (Long Short-Term Memory) networks excel at learning patterns in time series data - perfect for predicting cluster behavior.
+
+**What you'll learn:**
+
+* How LSTM networks capture temporal dependencies
+* Building sequence-to-sequence prediction models
+* Training on Prometheus metrics time series
+* Comparing LSTM vs. traditional methods
+
+**Key concepts:**
+
+[source]
+----
+Time Series Data → LSTM Encoder → Hidden State → LSTM Decoder → Predictions
+     [t-n...t]                                                    [t+1...t+m]
+----
+
+**Steps:**
+
+. In Jupyter, navigate to `notebooks/02-anomaly-detection/`
+. Open `03-lstm-based-prediction.ipynb`
+. Run all cells sequentially
+. Observe how the model learns temporal patterns
+. Compare predictions with actual values
+
+**Expected outcomes:**
+
+* Trained LSTM model for resource prediction
+* Understanding of sequence length and window size tradeoffs
+* Comparison metrics: MAE, RMSE, R²
+
+=== Exercise 1.2: Ensemble Anomaly Detection
+
+**Notebook**: `notebooks/02-anomaly-detection/04-ensemble-anomaly-methods.ipynb`
+
+Ensemble methods combine multiple detection algorithms for more robust anomaly detection.
+
+**What you'll learn:**
+
+* Voting classifiers for anomaly consensus
+* Stacking multiple algorithms (Isolation Forest + One-Class SVM + LOF)
+* Weighted ensembles based on algorithm confidence
+* When to use ensemble vs. single models
+
+**Ensemble architecture:**
+
+[source]
+----
+                    ┌─────────────────────┐
+                    │  Isolation Forest   │──┐
+                    └─────────────────────┘  │
+                                             │
+Input Metrics ──────┤ One-Class SVM │────────┼──→ Voting → Final Decision
+                    └─────────────────────┘  │      (majority/weighted)
+                    ┌─────────────────────┐  │
+                    │  Local Outlier      │──┘
+                    │  Factor (LOF)       │
+                    └─────────────────────┘
+----
+
+**Steps:**
+
+. Open `notebooks/02-anomaly-detection/04-ensemble-anomaly-methods.ipynb`
+. Execute the notebook cells
+. Observe how different algorithms vote on anomalies
+. Compare precision/recall of ensemble vs. individual models
+
+**Challenge exercise:**
+
+* Modify the voting weights to favor algorithms with higher precision
+* Add a fourth algorithm (DBSCAN) to the ensemble
+* Test with injected synthetic anomalies
+
+== Part 2: Building Custom Models
+
+=== Exercise 2.1: KServe Model Onboarding
+
+**Notebook**: `notebooks/00-setup/01-kserve-model-onboarding.ipynb`
+
+Learn the complete process of taking a trained model and deploying it to KServe for real-time inference.
+
+**What you'll learn:**
+
+* Model serialization formats (joblib, pickle, ONNX)
+* KServe InferenceService specification
+* Storage configuration (PVC, S3)
+* Health probes and scaling
+
+**Steps:**
+
+. Open `notebooks/00-setup/01-kserve-model-onboarding.ipynb`
+. Follow the guided onboarding process
+. Deploy a sample model to KServe
+. Test the inference endpoint
+
+=== Exercise 2.2: Deploy Your Own Model
+
+**Notebook**: `notebooks/04-model-serving/kserve-model-deployment.ipynb`
+
+Now deploy a model you've trained to the platform!
+
+**Challenge: Create a custom anomaly detector**
+
+. **Choose your algorithm**: Use one from Exercise 1 or create your own
+. **Train on your data**: Use Prometheus metrics from your cluster
+. **Package the model**: Save using joblib
+. **Deploy to KServe**: Create InferenceService
+. **Integrate with Coordination Engine**: Update model registry
+
+**Model template:**
+
+[source,python]
+----
+import joblib
+from sklearn.ensemble import IsolationForest
+import numpy as np
+
+# Train your custom model
+model = IsolationForest(
+    n_estimators=200,
+    contamination=0.05,
+    random_state=42
+)
+model.fit(your_training_data)
+
+# Save the model
+joblib.dump(model, '/mnt/models/my-custom-detector/model.pkl')
+
+print("✅ Model saved!")
+----
+
+**InferenceService template:**
+
+[source,yaml]
+----
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: my-custom-detector
+  namespace: {namespace}
+spec:
+  predictor:
+    model:
+      modelFormat:
+        name: sklearn
+      storageUri: pvc://model-storage-pvc/my-custom-detector/
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "1Gi"
+        limits:
+          cpu: "1"
+          memory: "2Gi"
+----
+
+=== Exercise 2.3: MLOps Model Versioning
+
+**Notebook**: `notebooks/04-model-serving/model-versioning-mlops.ipynb`
+
+Learn production MLOps practices for managing model versions.
+
+**What you'll learn:**
+
+* Model versioning strategies
+* A/B testing with canary deployments
+* Rollback procedures
+* Performance monitoring and drift detection
+
+**Key MLOps concepts:**
+
+[cols="1,2"]
+|===
+|Concept |Description
+
+|**Model Registry**
+|Central catalog of all model versions with metadata
+
+|**Canary Deployment**
+|Route small % of traffic to new model version
+
+|**Shadow Mode**
+|New model runs alongside production, results compared
+
+|**Drift Detection**
+|Monitor for data/concept drift that degrades performance
+|===
+
+== Part 3: Integration Challenges
+
+=== Challenge 3.1: End-to-End Custom Model Pipeline
+
+Create a complete pipeline that:
+
+. Collects metrics from Prometheus (last 7 days)
+. Trains a custom LSTM model
+. Deploys to KServe
+. Registers with Coordination Engine
+. Tests via Lightspeed query
+
+**Success criteria:**
+
+* [ ] Model deployed and READY in KServe
+* [ ] Lightspeed can query your model: "Use my-custom-detector to analyze the cluster"
+* [ ] Predictions return within 100ms
+
+=== Challenge 3.2: Scheduled Retraining
+
+Set up automated weekly retraining for your custom model:
+
+[source,yaml]
+----
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: retrain-my-custom-detector
+  namespace: {namespace}
+spec:
+  schedule: "0 3 * * 0"  # Sundays 3 AM
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: trainer
+            image: image-registry.openshift-image-registry.svc:5000/{namespace}/notebook-validator:latest
+            env:
+            - name: NOTEBOOK_PATH
+              value: "notebooks/02-anomaly-detection/my-custom-training.ipynb"
+            - name: MODEL_NAME
+              value: "my-custom-detector"
+----
+
+== Notebook Reference
+
+[cols="2,3,1"]
+|===
+|Notebook |Purpose |Difficulty
+
+|`03-lstm-based-prediction.ipynb`
+|LSTM neural network for time series
+|⭐⭐⭐
+
+|`04-ensemble-anomaly-methods.ipynb`
+|Ensemble anomaly detection
+|⭐⭐⭐
+
+|`01-kserve-model-onboarding.ipynb`
+|Model onboarding to KServe
+|⭐⭐
+
+|`kserve-model-deployment.ipynb`
+|Full deployment workflow
+|⭐⭐
+
+|`model-versioning-mlops.ipynb`
+|MLOps best practices
+|⭐⭐⭐
+
+|`synthetic-anomaly-generation.ipynb`
+|Generate test anomalies
+|⭐
+
+|`model-performance-monitoring.ipynb`
+|Monitor deployed models
+|⭐⭐
+|===
+
+== Summary
+
+In this extra credit module, you explored:
+
+* ✅ **LSTM Networks** - Deep learning for time series prediction
+* ✅ **Ensemble Methods** - Combining algorithms for robust detection
+* ✅ **Custom Model Deployment** - Full KServe deployment workflow
+* ✅ **MLOps Practices** - Versioning, canary deployments, monitoring
+
+== Next Steps
+
+Want to go even further?
+
+* **Contribute**: Add your custom model to the platform repository
+* **Blog**: Write about your experience with the workshop
+* **Extend**: Build MCP tools that expose your custom model to Lightspeed
+
+== Resources
+
+* {platform_repo}[Platform GitHub Repository]
+* https://kserve.github.io/website/[KServe Documentation]
+* https://www.tensorflow.org/tutorials/structured_data/time_series[TensorFlow Time Series Tutorial]
+* https://scikit-learn.org/stable/modules/ensemble.html[Scikit-learn Ensemble Methods]
+
+---
+
+**Congratulations on completing the Extra Credit! 🏆**
+
+You now have the skills to extend the Self-Healing Platform with your own custom ML models.

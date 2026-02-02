@@ -34,3 +34,12 @@
 ** xref:module-03.adoc#_part_4_extracting_actionable_insights[Part 4: Extracting Insights]
 ** xref:module-03.adoc#_part_5_integration_patterns[Part 5: Integration Patterns]
 ** xref:module-03.adoc#_part_7_understanding_the_architecture[Part 7: Architecture]
+
+* xref:module-04.adoc[4. Extra Credit - Advanced ML & Custom Models]
+** xref:module-04.adoc#_part_1_advanced_ml_techniques[Part 1: Advanced ML Techniques]
+** xref:module-04.adoc#_exercise_1_1_lstm_neural_networks[Exercise 1.1: LSTM Networks]
+** xref:module-04.adoc#_exercise_1_2_ensemble_anomaly_detection[Exercise 1.2: Ensemble Methods]
+** xref:module-04.adoc#_part_2_building_custom_models[Part 2: Building Custom Models]
+** xref:module-04.adoc#_exercise_2_1_kserve_model_onboarding[Exercise 2.1: Model Onboarding]
+** xref:module-04.adoc#_exercise_2_2_deploy_your_own_model[Exercise 2.2: Deploy Your Model]
+** xref:module-04.adoc#_part_3_integration_challenges[Part 3: Integration Challenges]
