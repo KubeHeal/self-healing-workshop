@@ -39,10 +39,16 @@ This workshop demonstrates the **OpenShift AI Ops Self-Healing Platform** - an A
 
 == Project Status
 
-[NOTE]
+[WARNING]
 ====
-**Development Status:** This workshop is actively in development. The deployment strategy is evolving:
+**🚧 IN DEVELOPMENT** - This repository is actively under development and not yet ready for production use.
 
+**Current State:**
+- Core workshop content and modules are complete
+- Deployment automation is being tested and validated
+- Integration points are being refined
+
+**Deployment Strategy:**
 - **Primary Direction**: AgnosticD V2 deployment (optimized for Red Hat Demo Platform and end-user workshops)
 - **Validation In Progress**: Testing integration with the https://github.com/KubeHeal/openshift-aiops-platform[OpenShift AI Ops Platform] fork-and-deploy workflow for development use cases
 - **Multiple Deployment Paths**: Choose based on your use case:
@@ -125,7 +131,7 @@ After successful deployment, you'll have:
 - ✅ ArgoCD managing GitOps deployments
 - ✅ Coordination engine and MCP server running
 - ✅ KServe ML models (anomaly-detector, predictive-analytics)
-- ✅ Jupyter workbench for notebook development (accessible via port-forward)
+- ✅ Jupyter workbench running in OpenShift AI for notebook development
 - ✅ OpenShift Lightspeed integration (if configured)
 
 ==== Complete Instructions
@@ -210,8 +216,8 @@ The AgnosticD workload automatically deploys:
 * ✅ Validated Patterns Operator (GitOps deployment framework)
 * ✅ Self-Healing Platform components (coordination engine, MCP server)
 * ✅ KServe ML models for anomaly detection
+* ✅ OpenShift AI with Jupyter workbench containing all workshop notebooks
 * ✅ OpenShift Lightspeed operator (optional AI assistant)
-* ✅ Jupyter workbench with all workshop notebooks
 * ✅ ArgoCD application for continuous GitOps sync
 
 ==== Post-Deployment Steps
@@ -231,8 +237,12 @@ After deployment completes, you'll need to:
    ~/self-healing-workshop/scripts/validate-workshop.sh
    ```
 
-3. **Access Jupyter notebooks**:
+3. **Access Jupyter notebooks in OpenShift AI**:
    ```bash
+   # Get the OpenShift AI dashboard URL
+   oc get route rhods-dashboard -n redhat-ods-applications -o jsonpath='{.spec.host}'
+
+   # Or access workbench directly via port-forward (for development)
    oc port-forward self-healing-workbench-0 8888:8888 -n self-healing-platform
    # Open http://localhost:8888
    ```
