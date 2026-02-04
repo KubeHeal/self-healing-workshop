@@ -37,11 +37,118 @@ This workshop demonstrates the **OpenShift AI Ops Self-Healing Platform** - an A
 * Red Hat Demo Platform AWS sandbox (recommended)
 * LLM API key (OpenAI, Google Gemini, or Anthropic)
 
+== Project Status
+
+[NOTE]
+====
+**Development Status:** This workshop is actively in development. The deployment strategy is evolving:
+
+- **Primary Direction**: AgnosticD V2 deployment (optimized for Red Hat Demo Platform and end-user workshops)
+- **Validation In Progress**: Testing integration with the https://github.com/KubeHeal/openshift-aiops-platform[OpenShift AI Ops Platform] fork-and-deploy workflow for development use cases
+- **Multiple Deployment Paths**: Choose based on your use case:
+  - Developers: Option 1 (Fork and Deploy) provides full control and customization
+  - End Users/Workshop Participants: Option 2 (AgnosticD) provides automated, managed deployment
+====
+
 == Deployment Options
 
-=== Option 1: Using AgnosticD V2 (Recommended)
+=== Option 1: Fork and Deploy (Recommended for Development)
 
-The workshop includes an AgnosticD V2 workload that pre-deploys the entire self-healing platform automatically.
+**Use this option if you:**
+- Want full control over the platform deployment
+- Need to customize values files or Helm charts
+- Are developing or testing platform features
+- Prefer manual step-by-step deployment
+
+This deployment method uses the comprehensive instructions from the main OpenShift AI Ops Platform repository.
+
+==== Prerequisites
+
+- OpenShift 4.18+ cluster with admin access
+- Local workstation with:
+  - `podman` - Container runtime
+  - `oc`, `kubectl`, `helm` - Kubernetes CLIs
+  - `ansible-navigator` - Ansible execution environment runner
+- Red Hat Ansible Automation Hub token (https://console.redhat.com/ansible/automation-hub/token[get one here])
+- Red Hat registry credentials (https://access.redhat.com/terms-based-registry/[get credentials here])
+
+==== Key Steps Overview
+
+[IMPORTANT]
+====
+**Critical Configuration:** You must fork the repository and update Git URLs in values files, or ArgoCD will fail to sync.
+====
+
+1. **Fork the repository** on GitHub:
+   - Navigate to https://github.com/KubeHeal/openshift-aiops-platform
+   - Click "Fork" to create your own copy
+
+2. **Clone YOUR fork**:
+   ```bash
+   git clone https://github.com/YOUR-USERNAME/openshift-aiops-platform.git
+   cd openshift-aiops-platform
+   ```
+
+3. **Update Git repository URLs** (CRITICAL):
+   - Edit `values-global.yaml` (line 98) - Update `git.repoURL` to YOUR fork URL
+   - Edit `values-hub.yaml` (line 57) - Update `repoURL` to YOUR fork URL
+
+   ```bash
+   vi values-global.yaml
+   # Change: repoURL: "https://gitea-with-admin-gitea.apps.cluster-pvbs6..."
+   # To:     repoURL: "https://github.com/YOUR-USERNAME/openshift-aiops-platform.git"
+
+   vi values-hub.yaml
+   # Change: repoURL: "https://gitea-with-admin-gitea.apps.cluster-pvbs6..."
+   # To:     repoURL: "https://github.com/YOUR-USERNAME/openshift-aiops-platform.git"
+   ```
+
+4. **Set Ansible Hub token and build execution environment**:
+   ```bash
+   export ANSIBLE_HUB_TOKEN='your-token-here'
+   podman login registry.redhat.io
+   make build-ee
+   ```
+
+5. **Deploy the platform**:
+   ```bash
+   make check-prerequisites
+   make operator-deploy-prereqs
+   make operator-deploy
+   make argo-healthcheck
+   ```
+
+==== Expected Outcome
+
+After successful deployment, you'll have:
+- ✅ Self-healing platform deployed in `self-healing-platform` namespace
+- ✅ ArgoCD managing GitOps deployments
+- ✅ Coordination engine and MCP server running
+- ✅ KServe ML models (anomaly-detector, predictive-analytics)
+- ✅ Jupyter workbench for notebook development (accessible via port-forward)
+- ✅ OpenShift Lightspeed integration (if configured)
+
+==== Complete Instructions
+
+For detailed step-by-step instructions, troubleshooting, and advanced configuration options, see:
+
+**📖 https://github.com/KubeHeal/openshift-aiops-platform#option-1-fork-and-deploy-recommended-for-development[OpenShift AI Ops Platform - Fork and Deploy Guide]**
+
+=== Option 2: AgnosticD V2 Deployment (Recommended for End Users)
+
+**Use this option if you:**
+- Are participating in a workshop or training
+- Want automated, managed deployment
+- Are using Red Hat Demo Platform sandboxes
+- Prefer a streamlined deployment with minimal manual steps
+
+The workshop includes an AgnosticD V2 workload that automatically deploys the entire self-healing platform using a pre-built execution environment.
+
+[NOTE]
+====
+**For Advanced AgnosticD Users:** Complete AgnosticD V2 setup and configuration documentation is available at:
+https://raw.githubusercontent.com/agnosticd/agnosticd-v2/refs/heads/main/docs/setup.adoc[AgnosticD V2 Setup Guide]
+====
 
 ==== Step 1: Clone AgnosticD V2
 
@@ -96,26 +203,39 @@ cd ~/agnosticd-v2
 ./bin/agd provision -g workshop1 -c self-healing-workshop -a YOUR_SANDBOX_NAME
 ----
 
-The workload will:
+==== What Gets Deployed
 
-* ✅ Deploy Validated Patterns Operator
-* ✅ Deploy the Self-Healing Platform (ArgoCD, ML models, coordination engine)
-* ✅ Configure OpenShift Lightspeed with MCP Server
-* ✅ Set up Jupyter workbench with all notebooks
+The AgnosticD workload automatically deploys:
 
-=== Option 2: Manual Deployment
+* ✅ Validated Patterns Operator (GitOps deployment framework)
+* ✅ Self-Healing Platform components (coordination engine, MCP server)
+* ✅ KServe ML models for anomaly detection
+* ✅ OpenShift Lightspeed operator (optional AI assistant)
+* ✅ Jupyter workbench with all workshop notebooks
+* ✅ ArgoCD application for continuous GitOps sync
 
-If you prefer to deploy manually without AgnosticD V2:
+==== Post-Deployment Steps
 
-[source,bash]
-----
-# Clone the main platform repository
-git clone https://github.com/KubeHeal/openshift-aiops-platform.git
-cd openshift-aiops-platform
+After deployment completes, you'll need to:
 
-# Follow the README for deployment
-# https://github.com/KubeHeal/openshift-aiops-platform#installation
-----
+1. **Create LLM API key secret** (if using OpenShift Lightspeed):
+   ```bash
+   oc create secret generic openai-credentials \
+     -n openshift-lightspeed \
+     --from-literal=api_key='your-api-key-here'
+   ```
+
+2. **Validate deployment**:
+   ```bash
+   # Use the workshop validation script
+   ~/self-healing-workshop/scripts/validate-workshop.sh
+   ```
+
+3. **Access Jupyter notebooks**:
+   ```bash
+   oc port-forward self-healing-workbench-0 8888:8888 -n self-healing-platform
+   # Open http://localhost:8888
+   ```
 
 == Access the Workshop
 
