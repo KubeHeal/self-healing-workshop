@@ -5,6 +5,13 @@
 # These can be overridden in the AgnosticD vars file
 
 # ============================================================
+# AgnosticD Integration
+# ============================================================
+
+# OpenShift username (set by AgnosticD, defaults to admin if not provided)
+ocp_username: "admin"
+
+# ============================================================
 # Execution Environment Configuration
 # ============================================================
 
