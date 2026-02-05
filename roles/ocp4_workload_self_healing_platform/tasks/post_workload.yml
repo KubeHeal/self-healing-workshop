@@ -1,0 +1,134 @@
+---
+# vim: set ft=ansible:
+
+# Post-workload validation for Self-Healing Platform
+# Validates deployment and provides user information
+
+- name: Post-Workload | Validating Self-Healing Platform deployment
+  ansible.builtin.debug:
+    msg: "Validating Self-Healing Platform deployment"
+
+# Verify all pods are running
+- name: Post-Workload | Get all pods in namespace
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: "{{ self_healing_platform_namespace }}"
+  register: r_all_pods
+
+- name: Post-Workload | Count running pods
+  ansible.builtin.set_fact:
+    running_pods: "{{ r_all_pods.resources | selectattr('status.phase', 'equalto', 'Running') | list | length }}"
+    total_pods: "{{ r_all_pods.resources | length }}"
+
+- name: Post-Workload | Display pod status
+  ansible.builtin.debug:
+    msg: "Pods: {{ running_pods }}/{{ total_pods }} running"
+
+# Check InferenceServices
+- name: Post-Workload | Get InferenceServices
+  kubernetes.core.k8s_info:
+    api_version: serving.kserve.io/v1beta1
+    kind: InferenceService
+    namespace: "{{ self_healing_platform_namespace }}"
+  register: r_inference_services
+  failed_when: false
+
+- name: Post-Workload | Display InferenceService status
+  when: r_inference_services.resources | length > 0
+  ansible.builtin.debug:
+    msg: |
+      InferenceServices:
+      {% for isvc in r_inference_services.resources %}
+      - {{ isvc.metadata.name }}: {{ isvc.status.conditions | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | first | default('Unknown') }}
+      {% endfor %}
+
+# Get ArgoCD application status
+- name: Post-Workload | Get ArgoCD Application status
+  kubernetes.core.k8s_info:
+    api_version: argoproj.io/v1alpha1
+    kind: Application
+    name: self-healing-platform
+    namespace: openshift-gitops
+  register: r_argocd_app
+  failed_when: false
+
+- name: Post-Workload | Display ArgoCD status
+  when: r_argocd_app.resources | length > 0
+  ansible.builtin.debug:
+    msg: |
+      ArgoCD Application Status:
+      - Sync: {{ r_argocd_app.resources[0].status.sync.status | default('Unknown') }}
+      - Health: {{ r_argocd_app.resources[0].status.health.status | default('Unknown') }}
+
+# Generate user info
+- name: Post-Workload | Get OpenShift console URL
+  kubernetes.core.k8s_info:
+    api_version: config.openshift.io/v1
+    kind: Console
+    name: cluster
+  register: r_console
+
+- name: Post-Workload | Get ArgoCD route
+  kubernetes.core.k8s_info:
+    api_version: route.openshift.io/v1
+    kind: Route
+    name: openshift-gitops-server
+    namespace: openshift-gitops
+  register: r_argocd_route
+  failed_when: false
+
+- name: Post-Workload | Set console URL
+  ansible.builtin.set_fact:
+    console_url: "{{ r_console.resources[0].status.consoleURL }}"
+    argocd_url: "https://{{ r_argocd_route.resources[0].spec.host }}"
+  when:
+    - r_console.resources | length > 0
+    - r_argocd_route.resources | length > 0
+
+# Print user info using agnosticd_user_info
+- name: Post-Workload | Print workshop access information
+  agnosticd_user_info:
+    msg: |
+      
+      ========================================
+      Self-Healing Workshop Environment Ready
+      ========================================
+      
+      OpenShift Console: {{ console_url | default('Check cluster') }}
+      ArgoCD Dashboard: {{ argocd_url | default('Check cluster') }}
+      
+      Namespace: {{ self_healing_platform_namespace }}
+      
+      Workshop Access:
+      - Click the Lightspeed icon (✨) in the OpenShift console
+      - Follow the workshop modules
+      
+      Quick Commands:
+      oc get pods -n {{ self_healing_platform_namespace }}
+      oc get inferenceservices -n {{ self_healing_platform_namespace }}
+      
+      Documentation:
+      https://github.com/KubeHeal/self-healing-workshop
+      
+      ========================================
+  when: agnosticd_user_info is defined
+
+- name: Post-Workload | Display workshop access (fallback)
+  ansible.builtin.debug:
+    msg: |
+      
+      ========================================
+      Self-Healing Workshop Environment Ready
+      ========================================
+      
+      OpenShift Console: {{ console_url | default('Check cluster') }}
+      ArgoCD Dashboard: {{ argocd_url | default('Check cluster') }}
+      
+      Namespace: {{ self_healing_platform_namespace }}
+      
+      Quick Commands:
+      oc get pods -n {{ self_healing_platform_namespace }}
+      oc get inferenceservices -n {{ self_healing_platform_namespace }}
+      
+      ========================================

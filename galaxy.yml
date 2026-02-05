@@ -1,0 +1,20 @@
+---
+namespace: kubeheal
+name: self_healing_workshop
+version: 1.0.0
+readme: README.adoc
+authors:
+  - KubeHeal Team
+description: Self-Healing Platform Workshop - AgnosticD workload for deploying the OpenShift AI-Ops Platform
+license:
+  - Apache-2.0
+tags:
+  - openshift
+  - aiops
+  - self_healing
+  - workshop
+  - agnosticd
+repository: https://github.com/KubeHeal/self-healing-workshop
+documentation: https://github.com/KubeHeal/self-healing-workshop/blob/main/README.adoc
+homepage: https://github.com/KubeHeal/self-healing-workshop
+issues: https://github.com/KubeHeal/self-healing-workshop/issues

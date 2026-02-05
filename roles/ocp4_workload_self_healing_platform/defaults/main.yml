@@ -1,0 +1,83 @@
+---
+# vim: set ft=ansible:
+
+# Default variables for ocp4_workload_self_healing_platform
+# These can be overridden in the AgnosticD vars file
+
+# ============================================================
+# Execution Environment Configuration
+# ============================================================
+
+# Pre-built execution environment image (no local build required)
+# This image is automatically built and pushed by GitHub Actions
+# See: https://github.com/KubeHeal/openshift-aiops-platform/actions/workflows/build-ee.yml
+self_healing_platform_ee_image: "quay.io/takinosh/openshift-aiops-platform-ee:latest"
+
+# ============================================================
+# Platform Configuration
+# ============================================================
+
+# Namespace where the platform will be deployed
+self_healing_platform_namespace: "self-healing-platform"
+
+# Git repository containing the platform
+self_healing_platform_git_repo: "https://github.com/KubeHeal/openshift-aiops-platform.git"
+self_healing_platform_git_ref: "main"
+
+# ============================================================
+# OpenShift Lightspeed Configuration
+# ============================================================
+
+# Whether to deploy OpenShift Lightspeed operator
+self_healing_platform_deploy_lightspeed: true
+
+# LLM provider to use (openai, gemini, anthropic, ibm_bam, azure_openai)
+self_healing_platform_llm_provider: "openai"
+
+# Whether to cleanup Lightspeed OLSConfig on removal
+# (operator is retained to avoid affecting other workloads)
+self_healing_platform_cleanup_lightspeed: false
+
+# ============================================================
+# Model Training Configuration
+# ============================================================
+
+# Default data source for model training
+self_healing_platform_training_data_source: "prometheus"
+
+# Default training hours
+self_healing_platform_training_hours: 168
+
+# ============================================================
+# Resource Configuration
+# ============================================================
+
+# Storage class to use (empty = default)
+self_healing_platform_storage_class: ""
+
+# Model storage size
+self_healing_platform_model_storage_size: "10Gi"
+
+# ============================================================
+# Workshop Configuration
+# ============================================================
+
+# Whether this is a workshop deployment
+self_healing_platform_workshop_mode: true
+
+# Workshop name (used for labeling)
+self_healing_platform_workshop_name: "self-healing-workshop"
+
+# ============================================================
+# Advanced Configuration
+# ============================================================
+
+# Deploy GPU workloads (requires GPU nodes)
+self_healing_platform_deploy_gpu_workloads: false
+
+# Deploy full Jupyter workbench
+self_healing_platform_deploy_workbench: true
+
+# ArgoCD sync policy
+self_healing_platform_argocd_auto_sync: true
+self_healing_platform_argocd_self_heal: true

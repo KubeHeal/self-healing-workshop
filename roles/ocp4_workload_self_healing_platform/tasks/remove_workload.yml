@@ -1,0 +1,138 @@
+---
+# vim: set ft=ansible:
+
+# Remove workload tasks for Self-Healing Platform
+# Cleans up all deployed resources
+
+- name: Remove Workload | Removing Self-Healing Platform
+  ansible.builtin.debug:
+    msg: "Removing Self-Healing Platform from {{ self_healing_platform_namespace }}"
+
+# Remove ArgoCD Application
+- name: Remove Workload | Delete ArgoCD Application
+  kubernetes.core.k8s:
+    state: absent
+    api_version: argoproj.io/v1alpha1
+    kind: Application
+    name: self-healing-platform
+    namespace: openshift-gitops
+  failed_when: false
+
+# Wait for ArgoCD to clean up resources
+- name: Remove Workload | Wait for ArgoCD cleanup
+  ansible.builtin.pause:
+    seconds: 30
+
+# Remove Helm release if exists
+- name: Remove Workload | Check for Helm release
+  ansible.builtin.command:
+    cmd: helm status self-healing-platform -n {{ self_healing_platform_namespace }}
+  register: r_helm_status
+  changed_when: false
+  failed_when: false
+
+- name: Remove Workload | Remove Helm release
+  when: r_helm_status.rc == 0
+  kubernetes.core.helm:
+    name: self-healing-platform
+    release_namespace: "{{ self_healing_platform_namespace }}"
+    state: absent
+    wait: true
+    timeout: 10m0s
+
+# Remove InferenceServices
+- name: Remove Workload | Delete InferenceServices
+  kubernetes.core.k8s:
+    state: absent
+    api_version: serving.kserve.io/v1beta1
+    kind: InferenceService
+    namespace: "{{ self_healing_platform_namespace }}"
+    name: "{{ item }}"
+  loop:
+    - anomaly-detector
+    - predictive-analytics
+  failed_when: false
+
+# Remove PVCs
+- name: Remove Workload | Get PVCs in namespace
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: PersistentVolumeClaim
+    namespace: "{{ self_healing_platform_namespace }}"
+  register: r_pvcs
+
+- name: Remove Workload | Delete PVCs
+  kubernetes.core.k8s:
+    state: absent
+    api_version: v1
+    kind: PersistentVolumeClaim
+    name: "{{ item.metadata.name }}"
+    namespace: "{{ self_healing_platform_namespace }}"
+  loop: "{{ r_pvcs.resources }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+  when: r_pvcs.resources | length > 0
+  failed_when: false
+
+# Remove ClusterRoleBindings
+- name: Remove Workload | Delete ClusterRoleBindings
+  kubernetes.core.k8s:
+    state: absent
+    api_version: rbac.authorization.k8s.io/v1
+    kind: ClusterRoleBinding
+    name: "{{ item }}"
+  loop:
+    - self-healing-workbench-cluster-admin
+    - self-healing-workbench-monitoring-view
+  failed_when: false
+
+# Remove namespace
+- name: Remove Workload | Delete namespace
+  kubernetes.core.k8s:
+    state: absent
+    api_version: v1
+    kind: Namespace
+    name: "{{ self_healing_platform_namespace }}"
+  failed_when: false
+
+# Wait for namespace deletion
+- name: Remove Workload | Wait for namespace deletion
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Namespace
+    name: "{{ self_healing_platform_namespace }}"
+  register: r_namespace_check
+  until: r_namespace_check.resources | length == 0
+  retries: 30
+  delay: 10
+  failed_when: false
+
+# Optionally remove Lightspeed OLSConfig (but keep operator)
+- name: Remove Workload | Delete OLSConfig
+  kubernetes.core.k8s:
+    state: absent
+    api_version: ols.openshift.io/v1alpha1
+    kind: OLSConfig
+    name: cluster
+    namespace: openshift-lightspeed
+  failed_when: false
+  when: self_healing_platform_cleanup_lightspeed | default(false) | bool
+
+- name: Remove Workload | Cleanup complete
+  ansible.builtin.debug:
+    msg: |
+      ✅ Self-Healing Platform removed
+      
+      Cleaned up:
+      - ArgoCD Application
+      - Helm release
+      - InferenceServices
+      - PVCs
+      - ClusterRoleBindings
+      - Namespace: {{ self_healing_platform_namespace }}
+      
+      Retained (if installed):
+      - Validated Patterns Operator
+      - OpenShift GitOps Operator
+      - OpenShift Pipelines Operator
+      - OpenShift Lightspeed Operator
