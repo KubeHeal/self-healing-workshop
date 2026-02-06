@@ -350,9 +350,82 @@ curl -X POST http://${PREDICTOR_IP}:8080/v1/models/anomaly-detector:predict \
   -d '{"instances": [[0.5, 0.6, 0.4, 0.3, 0.8]]}'
 ----
 
+== Pre-Training Health Check
+
+Before training, let's check the current state of the ML models. During platform deployment, the NotebookValidationJobs automatically executed the training notebooks and saved model artifacts to the shared storage. However, due to deployment timing, the predictor pods may have started before the models were written -- meaning the models exist on disk but aren't loaded by the serving containers.
+
+=== Step 1: Check Which Models Are Loaded
+
+Query each predictor to see if it has a model registered:
+
+[source,bash,role=execute]
+----
+# Check anomaly-detector
+ANOMALY_IP=$(oc get pod -n {namespace} \
+  -l serving.kserve.io/inferenceservice=anomaly-detector \
+  -o jsonpath='{.items[0].status.podIP}')
+
+echo "=== Anomaly Detector Models ==="
+oc exec -n self-healing-platform deployment/coordination-engine -- \
+  curl -s "http://${ANOMALY_IP}:8080/v1/models"
+----
+
+[source,bash,role=execute]
+----
+# Check predictive-analytics
+PREDICT_IP=$(oc get pod -n {namespace} \
+  -l serving.kserve.io/inferenceservice=predictive-analytics \
+  -o jsonpath='{.items[0].status.podIP}')
+
+echo "=== Predictive Analytics Models ==="
+oc exec -n self-healing-platform deployment/coordination-engine -- \
+  curl -s "http://${PREDICT_IP}:8080/v1/models"
+----
+
+If both return `{"models":[]}`, the predictor pods started before the training notebooks finished writing the model files. This is expected on a fresh deployment.
+
+=== Step 2: Verify Model Files Exist on Storage
+
+Even if the predictors haven't loaded the models, the files should exist on the shared PVC:
+
+[source,bash,role=execute]
+----
+# Check model artifacts on the shared PVC
+for model in anomaly-detector predictive-analytics; do
+  echo "=== ${model} ==="
+  oc exec -n {namespace} \
+    $(oc get pod -n {namespace} \
+      -l serving.kserve.io/inferenceservice=anomaly-detector \
+      -o jsonpath='{.items[0].metadata.name}') -- \
+    ls -lh /mnt/models/${model}/ 2>/dev/null || echo "Directory not found"
+done
+----
+
+You should see `model.pkl` files in each directory. These were trained on synthetic data by the NotebookValidationJobs during deployment.
+
+=== Step 3: Check Predictor Logs
+
+If the models aren't loaded, the predictor logs will show why:
+
+[source,bash,role=execute]
+----
+oc logs -n {namespace} \
+  -l serving.kserve.io/inferenceservice=anomaly-detector \
+  --tail=5
+----
+
+A common message is `failed to locate model file` -- this means the predictor attempted to load the model at startup before the file was written.
+
+[NOTE]
+====
+**Why does this happen?** The InferenceService predictor pods (sync-wave 2) start before the NotebookValidationJobs (sync-wave 3+) complete training. The KServe sklearn server loads models only at startup and does not retry. After the training notebooks finish and write the model files, the predictors need to be restarted to pick them up.
+
+In the next section, you'll retrain the models using Tekton pipelines -- which will write fresh model files and restart the predictors automatically.
+====
+
 == Hands-On Exercise: Train Your First Model
 
-Let's train the anomaly detector with a short training window:
+Now that you've seen the current model state, let's train the anomaly detector with a short training window:
 
 === Step 1: Start Training
 
@@ -440,6 +513,36 @@ oc describe notebookvalidationjob <job-name> -n {namespace}
 * Prometheus unavailable (check connectivity)
 * Git repository inaccessible (verify URL)
 * Notebook syntax errors (test locally first)
+
+=== Model Not Loaded (Empty Model Registry)
+
+**Symptoms**: Predictor pod is Running, InferenceService shows Ready, but `GET /v1/models` returns `{"models":[]}` and predictions return `ModelNotFound`
+
+**Diagnosis**:
+[source,bash,role=execute]
+----
+# Check if models are registered
+PREDICTOR_IP=$(oc get pod -n {namespace} \
+  -l serving.kserve.io/inferenceservice=anomaly-detector \
+  -o jsonpath='{.items[0].status.podIP}')
+oc exec -n self-healing-platform deployment/coordination-engine -- \
+  curl -s "http://${PREDICTOR_IP}:8080/v1/models"
+
+# Check predictor logs for startup errors
+oc logs -n {namespace} \
+  -l serving.kserve.io/inferenceservice=anomaly-detector \
+  --tail=10
+----
+
+**Cause**: The predictor pod started before model files were written to the shared PVC. The KServe sklearn server loads models once at startup and does not retry.
+
+**Fix**: Retrain the model (which writes a new model file and triggers a predictor restart), or manually restart the predictor:
+
+[source,bash,role=execute]
+----
+oc rollout restart deployment/anomaly-detector-predictor -n {namespace}
+oc rollout restart deployment/predictive-analytics-predictor -n {namespace}
+----
 
 === Model Won't Load
 
