@@ -69,9 +69,21 @@ oc exec -n {namespace} deployment/anomaly-detector-predictor -- \
   ls -lh /mnt/models/anomaly-detector/
 ----
 
-=== Manual Training with Custom Time Window
+=== Manual Training with Custom Time Window (GPU Pipeline)
 
-Train the predictive analytics model with 30 days of data for capturing seasonal patterns:
+Train the predictive analytics model with 30 days of data for capturing seasonal patterns.
+
+[NOTE]
+====
+**New Architecture**: As of ADR-053, the platform uses **two separate pipelines**:
+
+* `model-training-pipeline` - CPU-only for anomaly-detector
+* `model-training-pipeline-gpu` - GPU support for predictive-analytics
+
+This separation provides better resource isolation and removes the sed patching issues from the old unified pipeline.
+
+Reference: https://github.com/KubeHeal/openshift-aiops-platform/blob/main/docs/adrs/053-tekton-model-training-pipelines.md
+====
 
 [source,bash,role=execute,subs="attributes+"]
 ----
@@ -83,7 +95,7 @@ metadata:
   namespace: {namespace}
 spec:
   pipelineRef:
-    name: model-training-pipeline
+    name: model-training-pipeline-gpu
   params:
     - name: model-name
       value: "predictive-analytics"
@@ -102,6 +114,47 @@ spec:
   timeout: 45m
 EOF
 ----
+
+**Requirements**:
+
+* GPU nodes with `nvidia.com/gpu.present: "true"` label
+* GPU tolerations configured (automatically handled by GPU pipeline)
+* Uses `gpu-training-pvc` (GP3 storage) instead of model-storage-pvc (CephFS)
+
+[TIP]
+====
+**Don't have GPU nodes?** Use the CPU pipeline with anomaly-detector for all examples:
+
+[source,bash,role=execute,subs="attributes+"]
+----
+oc create -f - <<EOF
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  generateName: train-anomaly-1week-
+  namespace: {namespace}
+spec:
+  pipelineRef:
+    name: model-training-pipeline
+  params:
+    - name: model-name
+      value: "anomaly-detector"
+    - name: notebook-path
+      value: "notebooks/02-anomaly-detection/01-isolation-forest-implementation.ipynb"
+    - name: data-source
+      value: "prometheus"
+    - name: training-hours
+      value: "168"
+    - name: inference-service-name
+      value: "anomaly-detector"
+    - name: git-url
+      value: "{platform_repo}.git"
+    - name: git-ref
+      value: "main"
+  timeout: 30m
+EOF
+----
+====
 
 === GPU-Accelerated Training with NotebookValidationJob
 
@@ -192,8 +245,38 @@ Choose the appropriate time window based on your use case:
 
 **Recommended defaults:**
 
-* **Anomaly Detector**: 168h (1 week) - Captures weekly patterns without excessive noise
-* **Predictive Analytics**: 720h (30 days) - Captures monthly trends and seasonality
+* **Anomaly Detector** (`model-training-pipeline`): 168h (1 week) - Captures weekly patterns without excessive noise
+* **Predictive Analytics** (`model-training-pipeline-gpu`): 720h (30 days) - Captures monthly trends and seasonality
+
+**Pipeline Selection Guide:**
+
+[cols="2,2,3"]
+|===
+|Model |Pipeline |Requirements
+
+|anomaly-detector
+|`model-training-pipeline`
+|CPU-only, works on any node
+
+|predictive-analytics
+|`model-training-pipeline-gpu`
+|Requires GPU nodes, uses GP3 storage
+
+|Custom CPU models
+|`model-training-pipeline`
+|Any custom notebook for CPU training
+
+|Custom GPU models
+|`model-training-pipeline-gpu`
+|Custom notebooks requiring GPU acceleration
+|===
+
+[NOTE]
+====
+**Training time**: Both pipelines complete in ~60 seconds regardless of the time window (24h, 168h, or 720h). The Prometheus query and data collection time dominates, not the hours of data requested.
+
+**GPU availability**: If your cluster doesn't have GPU nodes, use `model-training-pipeline` with anomaly-detector for all training examples.
+====
 
 == Data Sources
 
@@ -256,6 +339,107 @@ params:
 [TIP]
 ====
 **Recommendation**: Use `prometheus` mode for production scheduled training to ensure models learn real cluster patterns.
+====
+
+== Choosing the Right Pipeline
+
+The platform provides two dedicated training pipelines optimized for different resource requirements:
+
+=== CPU Pipeline (`model-training-pipeline`)
+
+**Use for**: anomaly-detector and custom CPU-based models
+
+**Features**:
+
+* Runs on any node (no GPU required)
+* Uses `model-storage-pvc` (CephFS shared storage)
+* Faster startup (no GPU node scheduling)
+* Suitable for Isolation Forest, XGBoost, traditional ML algorithms
+
+**Example**:
+
+[source,bash,role=execute,subs="attributes+"]
+----
+oc create -f - <<EOF
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  generateName: train-cpu-model-
+  namespace: {namespace}
+spec:
+  pipelineRef:
+    name: model-training-pipeline
+  params:
+    - name: model-name
+      value: "anomaly-detector"
+    - name: notebook-path
+      value: "notebooks/02-anomaly-detection/01-isolation-forest-implementation.ipynb"
+    - name: data-source
+      value: "prometheus"
+    - name: training-hours
+      value: "168"
+    - name: inference-service-name
+      value: "anomaly-detector"
+    - name: git-url
+      value: "{platform_repo}.git"
+    - name: git-ref
+      value: "main"
+  timeout: 30m
+EOF
+----
+
+=== GPU Pipeline (`model-training-pipeline-gpu`)
+
+**Use for**: predictive-analytics and custom GPU-accelerated models
+
+**Features**:
+
+* Requires GPU nodes with `nvidia.com/gpu.present: "true"` label
+* Uses `gpu-training-pvc` (GP3 storage - GPU nodes may not have CephFS drivers)
+* Automatic GPU tolerations and nodeSelector
+* Suitable for LSTM, neural networks, deep learning models
+
+**Example**:
+
+[source,bash,role=execute,subs="attributes+"]
+----
+oc create -f - <<EOF
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  generateName: train-gpu-model-
+  namespace: {namespace}
+spec:
+  pipelineRef:
+    name: model-training-pipeline-gpu
+  params:
+    - name: model-name
+      value: "predictive-analytics"
+    - name: notebook-path
+      value: "notebooks/02-anomaly-detection/05-predictive-analytics-kserve.ipynb"
+    - name: data-source
+      value: "prometheus"
+    - name: training-hours
+      value: "720"
+    - name: inference-service-name
+      value: "predictive-analytics"
+    - name: git-url
+      value: "{platform_repo}.git"
+    - name: git-ref
+      value: "main"
+  timeout: 45m
+EOF
+----
+
+[IMPORTANT]
+====
+**Pipeline Mismatch**: Using the wrong pipeline for a model will cause failures:
+
+* ❌ `model-training-pipeline` + predictive-analytics = sed error (no GPU support)
+* ❌ `model-training-pipeline-gpu` + anomaly-detector = unnecessary GPU requirement
+* ✅ Match the pipeline to the model's resource requirements
+
+See ADR-053 for the architectural decision: https://github.com/KubeHeal/openshift-aiops-platform/blob/main/docs/adrs/053-tekton-model-training-pipelines.md
 ====
 
 == Automated Scheduled Training
