@@ -76,7 +76,7 @@ Let's deploy a simple Flask app that we'll use throughout the rest of this modul
 We use the Red Hat UBI Python image (`registry.access.redhat.com/ubi9/python-311`) because it's designed for OpenShift's security model, which runs containers as a random non-root UID.
 ====
 
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 oc apply -f - <<EOF
 apiVersion: apps/v1
@@ -253,7 +253,7 @@ Let's deploy a broken app to see self-healing in action.
 
 This app has a memory leak - each request allocates 10MB. With only 96Mi limit, it will OOMKill after a few requests.
 
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 oc apply -f - <<EOF
 apiVersion: apps/v1
@@ -303,7 +303,7 @@ EOF
 
 The app won't crash on its own - we need to trigger the memory leak by sending requests:
 
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 # Wait for pods to start
 sleep 30
@@ -675,7 +675,7 @@ All models healthy and performing well!
 
 Before moving to the next module, let's clean up the test deployments:
 
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 oc delete deployment sample-flask-app broken-app -n {namespace}
 ----

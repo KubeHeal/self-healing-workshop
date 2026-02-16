@@ -1,0 +1,18 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: workshop-docs
+  namespace: workshop-docs
+  labels:
+    app: workshop-docs
+    workshop: self-healing
+    app.kubernetes.io/part-of: self-healing-workshop
+spec:
+  to:
+    kind: Service
+    name: workshop-docs
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

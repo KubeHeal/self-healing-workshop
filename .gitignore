@@ -34,3 +34,6 @@ agnosticd-v2-output/
 
 # Auto-generated MCP server context (added automatically)
 .mcp-server-context.md
+
+# Auto-generated Claude Code context
+CLAUDE.md

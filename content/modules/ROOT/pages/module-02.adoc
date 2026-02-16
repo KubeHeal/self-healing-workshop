@@ -27,7 +27,7 @@ Before proceeding, ensure:
 * ✅ Admin access to the cluster
 
 Verify platform is running:
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 oc get pods -n {namespace}
 oc get inferenceservices -n {namespace}
@@ -41,7 +41,7 @@ The MCP (Model Context Protocol) Server enables OpenShift Lightspeed to interact
 
 The MCP Server should already be deployed by the AgnosticD workload:
 
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 oc get deployment cluster-health-mcp-server -n {namespace}
 oc get service cluster-health-mcp-server -n {namespace}
@@ -49,7 +49,7 @@ oc get service cluster-health-mcp-server -n {namespace}
 
 === Step 1.2: Check MCP Server Health
 
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 oc run test-curl --image=registry.access.redhat.com/ubi9/ubi-minimal:latest \
   --rm -i --restart=Never -n {namespace} -- \
@@ -68,7 +68,7 @@ oc run test-curl --image=registry.access.redhat.com/ubi9/ubi-minimal:latest \
 
 === Step 1.3: View MCP Server Logs
 
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 oc logs deployment/cluster-health-mcp-server -n {namespace} --tail=20
 ----
@@ -79,7 +79,7 @@ OpenShift Lightspeed requires an LLM provider. Choose ONE of the following:
 
 === Option A: OpenAI (Recommended)
 
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 # Get API key from https://platform.openai.com/api-keys
 oc create secret generic openai-api-key \
@@ -89,7 +89,7 @@ oc create secret generic openai-api-key \
 
 === Option B: Google Gemini
 
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 # Get API key from https://aistudio.google.com/apikey
 # Enable Generative Language API: https://console.cloud.google.com/apis/library/generativelanguage.googleapis.com
@@ -100,7 +100,7 @@ oc create secret generic google-api-key \
 
 === Option C: Anthropic Claude
 
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 # Get API key from https://console.anthropic.com/
 oc create secret generic anthropic-api-key \
@@ -122,7 +122,7 @@ The OLSConfig custom resource connects OpenShift Lightspeed to your MCP Server.
 Choose the configuration that matches your LLM provider:
 
 **For OpenAI:**
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 cat <<EOF | oc apply -f -
 apiVersion: ols.openshift.io/v1alpha1
@@ -165,7 +165,7 @@ EOF
 ----
 
 **For Google Gemini:**
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 cat <<EOF | oc apply -f -
 apiVersion: ols.openshift.io/v1alpha1
@@ -209,7 +209,7 @@ EOF
 
 === Step 3.2: Verify OLSConfig
 
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 # Check OLSConfig exists
 oc get olsconfig cluster
@@ -223,7 +223,7 @@ oc get olsconfig cluster -o jsonpath='{.status.conditions[*].status}' && echo
 
 === Step 3.3: Verify Lightspeed Pods
 
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 oc get pods -n openshift-lightspeed
 ----
@@ -263,7 +263,7 @@ Try these queries in Lightspeed:
 
 Watch MCP Server logs while asking questions:
 
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 oc logs -f deployment/cluster-health-mcp-server -n {namespace}
 ----
@@ -310,7 +310,7 @@ spec:
 
 === View Current Configuration
 
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 oc get olsconfig cluster -o yaml
 ----
@@ -345,7 +345,7 @@ oc get olsconfig cluster -o yaml
 === Creating LLM Provider Secrets
 
 **For OpenAI:**
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 oc create secret generic openai-credentials \
   -n openshift-lightspeed \
@@ -353,7 +353,7 @@ oc create secret generic openai-credentials \
 ----
 
 **For Google Gemini:**
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 oc create secret generic gemini-credentials \
   -n openshift-lightspeed \
@@ -702,7 +702,7 @@ Let's create a simple monitoring script:
 
 === Create the Script
 
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 cat > /tmp/monitor_with_lightspeed.py << 'EOF'
 #!/usr/bin/env python3

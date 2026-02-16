@@ -1,0 +1,25 @@
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: workshop-docs
+  namespace: workshop-docs
+  labels:
+    app: workshop-docs
+    workshop: self-healing
+    app.kubernetes.io/part-of: self-healing-workshop
+spec:
+  output:
+    to:
+      kind: ImageStreamTag
+      name: workshop-docs:latest
+  source:
+    type: Binary
+    binary: {}
+  strategy:
+    type: Source
+    sourceStrategy:
+      from:
+        kind: ImageStreamTag
+        name: httpd:2.4-ubi9
+        namespace: openshift
+  triggers: []

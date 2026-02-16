@@ -18,7 +18,7 @@ This module demonstrates how to train and deploy machine learning models using T
 
 Train the anomaly detector with 24 hours of recent data:
 
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 oc create -f - <<EOF
 apiVersion: tekton.dev/v1beta1
@@ -50,19 +50,19 @@ EOF
 
 Monitor the training progress:
 
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 # Watch pipeline execution
 tkn pipelinerun logs -f -n {namespace}
 ----
 
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 # Check training job status
 oc get notebookvalidationjobs -n {namespace}
 ----
 
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 # View model file
 oc exec -n {namespace} deployment/model-troubleshooting-utilities -- \
@@ -73,7 +73,7 @@ oc exec -n {namespace} deployment/model-troubleshooting-utilities -- \
 
 Train the predictive analytics model with 30 days of data for capturing seasonal patterns:
 
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 oc create -f - <<EOF
 apiVersion: tekton.dev/v1beta1
@@ -107,7 +107,7 @@ EOF
 
 For faster training, use GPU resources:
 
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 oc create -f - <<'EOF'
 apiVersion: mlops.mlops.dev/v1alpha1
@@ -264,19 +264,19 @@ The platform automatically retrains models weekly via CronJobs:
 
 === Anomaly Detector (Weekly, Sunday 2 AM UTC)
 
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 # View CronJob configuration
 oc get cronjob weekly-anomaly-detector-training -n {namespace} -o yaml
 ----
 
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 # View recent training runs
 oc get pipelineruns -n {namespace} -l model-name=anomaly-detector
 ----
 
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 # Check latest training job
 tkn pipelinerun logs -n {namespace} $(oc get pipelinerun -n {namespace} \
@@ -285,13 +285,13 @@ tkn pipelinerun logs -n {namespace} $(oc get pipelinerun -n {namespace} \
 
 === Predictive Analytics (Weekly, Sunday 3 AM UTC)
 
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 # View CronJob configuration
 oc get cronjob weekly-predictive-analytics-training -n {namespace} -o yaml
 ----
 
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 # View recent training runs
 oc get pipelineruns -n {namespace} -l model-name=predictive-analytics
@@ -301,13 +301,13 @@ oc get pipelineruns -n {namespace} -l model-name=predictive-analytics
 
 === Check Pipeline Status
 
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 # List all pipeline runs
 tkn pipelinerun list -n {namespace}
 ----
 
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 # Watch specific run (replace with actual name)
 tkn pipelinerun logs train-anomaly-detector-abc123 -f -n {namespace}
@@ -315,20 +315,20 @@ tkn pipelinerun logs train-anomaly-detector-abc123 -f -n {namespace}
 
 === Verify Model Deployment
 
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 # Check InferenceService status
 oc get inferenceservice anomaly-detector -n {namespace}
 ----
 
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 # Check predictor pod status
 oc get pods -l serving.kserve.io/inferenceservice=anomaly-detector \
   -n {namespace}
 ----
 
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 # View model file details
 oc exec -n {namespace} deployment/model-troubleshooting-utilities -- \
@@ -337,7 +337,7 @@ oc exec -n {namespace} deployment/model-troubleshooting-utilities -- \
 
 === Test Model Endpoint
 
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 # Get predictor pod IP
 PREDICTOR_IP=$(oc get pod -n {namespace} \
@@ -358,7 +358,7 @@ Before training, let's check the current state of the ML models. During platform
 
 Query each predictor to see if it has a model registered:
 
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 # Check anomaly-detector
 ANOMALY_IP=$(oc get pod -n {namespace} \
@@ -370,7 +370,7 @@ oc exec -n self-healing-platform deployment/coordination-engine -- \
   curl -s "http://${ANOMALY_IP}:8080/v1/models"
 ----
 
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 # Check predictive-analytics
 PREDICT_IP=$(oc get pod -n {namespace} \
@@ -388,7 +388,7 @@ If both return `{"models":[]}`, the predictor pods started before the training n
 
 Even if the predictors haven't loaded the models, the files should exist on the shared PVC:
 
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 # Check model artifacts on the shared PVC
 for model in anomaly-detector predictive-analytics; do
@@ -407,7 +407,7 @@ You should see `model.pkl` files in each directory. These were trained on synthe
 
 If the models aren't loaded, the predictor logs will show why:
 
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 oc logs -n {namespace} \
   -l serving.kserve.io/inferenceservice=anomaly-detector \
@@ -429,7 +429,7 @@ Now that you've seen the current model state, let's train the anomaly detector w
 
 === Step 1: Start Training
 
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 oc create -f - <<EOF
 apiVersion: tekton.dev/v1beta1
@@ -463,7 +463,7 @@ EOF
 
 === Step 2: Watch the Training
 
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 # Get the pipeline run name
 PIPELINERUN=$(oc get pipelinerun -n {namespace} -l workshop=self-healing \
@@ -477,7 +477,7 @@ tkn pipelinerun logs $PIPELINERUN -f -n {namespace}
 
 Once training completes:
 
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 # Check InferenceService
 oc get inferenceservice anomaly-detector -n {namespace}
@@ -497,7 +497,7 @@ anomaly-detector   http://anomaly-detector-predictor-default.svc    True
 **Symptoms**: Pipeline run fails, NotebookValidationJob shows error
 
 **Diagnosis**:
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 # Check pipeline logs
 tkn pipelinerun logs <pipelinerun-name> -f -n {namespace}
@@ -519,7 +519,7 @@ oc describe notebookvalidationjob <job-name> -n {namespace}
 **Symptoms**: Predictor pod is Running, InferenceService shows Ready, but `GET /v1/models` returns `{"models":[]}` and predictions return `ModelNotFound`
 
 **Diagnosis**:
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 # Check if models are registered
 PREDICTOR_IP=$(oc get pod -n {namespace} \
@@ -538,7 +538,7 @@ oc logs -n {namespace} \
 
 **Fix**: Retrain the model (which writes a new model file and triggers a predictor restart), or manually restart the predictor:
 
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 oc rollout restart deployment/anomaly-detector-predictor -n {namespace}
 oc rollout restart deployment/predictive-analytics-predictor -n {namespace}
@@ -549,7 +549,7 @@ oc rollout restart deployment/predictive-analytics-predictor -n {namespace}
 **Symptoms**: Predictor pod crashes, OOMKilled, CrashLoopBackOff
 
 **Diagnosis**:
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 # Check predictor pod logs
 oc logs -n {namespace} \
@@ -576,7 +576,7 @@ OpenShift Prometheus requires **bearer token authentication** over HTTPS port 90
 ====
 
 **Diagnosis**:
-[source,bash,role=execute]
+[source,bash,role=execute,subs="attributes+"]
 ----
 # Check Prometheus accessibility with bearer token
 oc exec -n {namespace} deployment/model-troubleshooting-utilities -- sh -c '

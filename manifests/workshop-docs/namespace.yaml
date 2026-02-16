@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: workshop-docs
+  labels:
+    workshop: self-healing
+    app.kubernetes.io/part-of: self-healing-workshop
+    app.kubernetes.io/name: workshop-docs
