@@ -65,7 +65,7 @@ oc get notebookvalidationjobs -n {namespace}
 [source,bash,role=execute,subs="attributes+"]
 ----
 # View model file
-oc exec -n {namespace} deployment/model-troubleshooting-utilities -- \
+oc exec -n {namespace} deployment/anomaly-detector-predictor -- \
   ls -lh /mnt/models/anomaly-detector/
 ----
 
@@ -331,7 +331,7 @@ oc get pods -l serving.kserve.io/inferenceservice=anomaly-detector \
 [source,bash,role=execute,subs="attributes+"]
 ----
 # View model file details
-oc exec -n {namespace} deployment/model-troubleshooting-utilities -- \
+oc exec -n {namespace} deployment/anomaly-detector-predictor -- \
   ls -lh /mnt/models/anomaly-detector/model.pkl
 ----
 
@@ -556,7 +556,7 @@ oc logs -n {namespace} \
   -l serving.kserve.io/inferenceservice=anomaly-detector
 
 # Check model file exists
-oc exec -n {namespace} deployment/model-troubleshooting-utilities -- \
+oc exec -n {namespace} deployment/anomaly-detector-predictor -- \
   ls -lh /mnt/models/anomaly-detector/
 ----
 
@@ -579,7 +579,7 @@ OpenShift Prometheus requires **bearer token authentication** over HTTPS port 90
 [source,bash,role=execute,subs="attributes+"]
 ----
 # Check Prometheus accessibility with bearer token
-oc exec -n {namespace} deployment/model-troubleshooting-utilities -- sh -c '
+oc exec -n {namespace} deployment/coordination-engine -- sh -c '
 TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
 curl -sk -H "Authorization: Bearer $TOKEN" \
   "https://prometheus-k8s.openshift-monitoring.svc:9091/api/v1/status/config" | head -c 200
