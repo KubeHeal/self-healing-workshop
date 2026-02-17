@@ -446,6 +446,16 @@ See ADR-053 for the architectural decision: https://github.com/KubeHeal/openshif
 
 The platform automatically retrains models weekly via CronJobs:
 
+[NOTE]
+====
+**Automated Training Schedule:**
+
+- **Anomaly Detector**: Sundays at 2:00 AM UTC (168h training window)
+- **Predictive Analytics**: Sundays at 3:00 AM UTC (720h training window)
+
+The CronJobs will trigger automatically on schedule. You can view the configuration and past runs below.
+====
+
 === Anomaly Detector (Weekly, Sunday 2 AM UTC)
 
 [source,bash,role=execute,subs="attributes+"]
