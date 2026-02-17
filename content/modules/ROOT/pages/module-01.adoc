@@ -539,9 +539,10 @@ PREDICTOR_IP=$(oc get pod -n {namespace} \
   -o jsonpath='{.items[0].status.podIP}')
 
 # Test anomaly detector
-curl -X POST http://${PREDICTOR_IP}:8080/v1/models/anomaly-detector:predict \
-  -H 'Content-Type: application/json' \
-  -d '{"instances": [[0.5, 0.6, 0.4, 0.3, 0.8]]}'
+oc exec -n {namespace} deployment/coordination-engine -- \
+  curl -X POST http://${PREDICTOR_IP}:8080/v1/models/anomaly-detector:predict \
+    -H 'Content-Type: application/json' \
+    -d '{"instances": [[0.5, 0.6, 0.4, 0.3, 0.8]]}'
 ----
 
 == Pre-Training Health Check
@@ -560,7 +561,7 @@ ANOMALY_IP=$(oc get pod -n {namespace} \
   -o jsonpath='{.items[0].status.podIP}')
 
 echo "=== Anomaly Detector Models ==="
-oc exec -n self-healing-platform deployment/coordination-engine -- \
+oc exec -n {namespace} deployment/coordination-engine -- \
   curl -s "http://${ANOMALY_IP}:8080/v1/models"
 ----
 
@@ -572,7 +573,7 @@ PREDICT_IP=$(oc get pod -n {namespace} \
   -o jsonpath='{.items[0].status.podIP}')
 
 echo "=== Predictive Analytics Models ==="
-oc exec -n self-healing-platform deployment/coordination-engine -- \
+oc exec -n {namespace} deployment/coordination-engine -- \
   curl -s "http://${PREDICT_IP}:8080/v1/models"
 ----
 
@@ -589,7 +590,7 @@ for model in anomaly-detector predictive-analytics; do
   echo "=== ${model} ==="
   oc exec -n {namespace} \
     $(oc get pod -n {namespace} \
-      -l serving.kserve.io/inferenceservice=anomaly-detector \
+      -l serving.kserve.io/inferenceservice=${model} \
       -o jsonpath='{.items[0].metadata.name}') -- \
     ls -lh /mnt/models/${model}/ 2>/dev/null || echo "Directory not found"
 done
@@ -719,7 +720,7 @@ oc describe notebookvalidationjob <job-name> -n {namespace}
 PREDICTOR_IP=$(oc get pod -n {namespace} \
   -l serving.kserve.io/inferenceservice=anomaly-detector \
   -o jsonpath='{.items[0].status.podIP}')
-oc exec -n self-healing-platform deployment/coordination-engine -- \
+oc exec -n {namespace} deployment/coordination-engine -- \
   curl -s "http://${PREDICTOR_IP}:8080/v1/models"
 
 # Check predictor logs for startup errors
