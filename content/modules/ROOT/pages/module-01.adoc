@@ -531,53 +531,121 @@ oc exec -n {namespace} deployment/anomaly-detector-predictor -- \
 
 === Test Model Endpoint
 
+Test the anomaly detector using the coordination-engine API:
+
 [source,bash,role=execute,subs="attributes+"]
 ----
-# Get predictor pod IP
-PREDICTOR_IP=$(oc get pod -n {namespace} \
-  -l serving.kserve.io/inferenceservice=anomaly-detector \
-  -o jsonpath='{.items[0].status.podIP}')
-
-# Test anomaly detector
+# Test anomaly detection with sample data (45 features required)
 oc exec -n {namespace} deployment/coordination-engine -- \
-  curl -X POST http://${PREDICTOR_IP}:8080/v1/models/anomaly-detector:predict \
+  curl -s -X POST http://localhost:8080/api/v1/detect \
     -H 'Content-Type: application/json' \
-    -d '{"instances": [[0.5, 0.6, 0.4, 0.3, 0.8]]}'
+    -d '{"model": "anomaly-detector", "instances": [[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}'
 ----
+
+Expected response:
+[source,json]
+----
+{"predictions":[-1],"model_name":"anomaly-detector"}
+----
+
+[NOTE]
+====
+The anomaly detector returns `-1` when it detects an anomaly and `1` when data appears normal. Test data with all zeros is flagged as an anomaly (expected behavior).
+====
+
+== Coordination Engine API Validation
+
+The coordination-engine provides a unified API for validating and interacting with ML models. This section demonstrates the key validation endpoints.
+
+=== Platform Health Check
+
+Check the overall platform health and dependencies:
+
+[source,bash,role=execute,subs="attributes+"]
+----
+# Detailed health check with dependencies
+oc exec -n {namespace} deployment/coordination-engine -- \
+  curl -s http://localhost:8080/api/v1/health
+----
+
+This returns:
+
+* **status**: Overall health (`ok` or `degraded`)
+* **dependencies**: Kubernetes and ML service connectivity
+* **rbac**: RBAC permissions validation
+* **uptime**: Time since coordination-engine started
+
+=== Resource Usage Prediction
+
+Test the predictive analytics model to forecast future resource usage:
+
+[source,bash,role=execute,subs="attributes+"]
+----
+# Predict future CPU and memory usage
+oc exec -n {namespace} deployment/coordination-engine -- \
+  curl -s -X POST http://localhost:8080/api/v1/predict \
+    -H 'Content-Type: application/json' \
+    -d '{"model": "predictive-analytics", "instances": [[0.5, 0.5, 0.5, 0.5, 0.5]]}'
+----
+
+Expected response:
+[source,json]
+----
+{
+  "status": "success",
+  "predictions": {
+    "cpu_percent": 2.06,
+    "memory_percent": 38.34
+  },
+  "current_metrics": {
+    "cpu_rolling_mean": 3.44,
+    "memory_rolling_mean": 26.92,
+    "timestamp": "2026-02-17T20:54:01Z"
+  },
+  "model_info": {
+    "name": "predictive-analytics",
+    "confidence": 0.85
+  }
+}
+----
+
+[TIP]
+====
+The coordination-engine API abstracts away KServe implementation details. You don't need to know pod IPs, service names, or model endpoint URLs - the coordination-engine handles all model communication internally.
+====
 
 == Pre-Training Health Check
 
 Before training, let's check the current state of the ML models. During platform deployment, the NotebookValidationJobs automatically executed the training notebooks and saved model artifacts to the shared storage. However, due to deployment timing, the predictor pods may have started before the models were written -- meaning the models exist on disk but aren't loaded by the serving containers.
 
-=== Step 1: Check Which Models Are Loaded
+=== Step 1: Check Platform Health and Model Registry
 
-Query each predictor to see if it has a model registered:
-
-[source,bash,role=execute,subs="attributes+"]
-----
-# Check anomaly-detector
-ANOMALY_IP=$(oc get pod -n {namespace} \
-  -l serving.kserve.io/inferenceservice=anomaly-detector \
-  -o jsonpath='{.items[0].status.podIP}')
-
-echo "=== Anomaly Detector Models ==="
-oc exec -n {namespace} deployment/coordination-engine -- \
-  curl -s "http://${ANOMALY_IP}:8080/v1/models"
-----
+Check the coordination-engine health and registered models:
 
 [source,bash,role=execute,subs="attributes+"]
 ----
-# Check predictive-analytics
-PREDICT_IP=$(oc get pod -n {namespace} \
-  -l serving.kserve.io/inferenceservice=predictive-analytics \
-  -o jsonpath='{.items[0].status.podIP}')
-
-echo "=== Predictive Analytics Models ==="
+# Check platform health
+echo "=== Platform Health ==="
 oc exec -n {namespace} deployment/coordination-engine -- \
-  curl -s "http://${PREDICT_IP}:8080/v1/models"
+  curl -s http://localhost:8080/health
+
+# List registered models
+echo -e "\n=== Registered Models ==="
+oc exec -n {namespace} deployment/coordination-engine -- \
+  curl -s http://localhost:8080/api/v1/models
 ----
 
-If both return `{"models":[]}`, the predictor pods started before the training notebooks finished writing the model files. This is expected on a fresh deployment.
+Expected output:
+[source,json]
+----
+=== Platform Health ===
+{"status":"ok","version":"ocp-4.18-eada2fc"}
+
+=== Registered Models ===
+{"models":["predictive-analytics","anomaly-detector"],"count":2}
+----
+
+If the models list is empty, the predictor pods started before the training notebooks finished writing the model files. This is expected on a fresh deployment.
 
 === Step 2: Verify Model Files Exist on Storage
 
@@ -716,12 +784,9 @@ oc describe notebookvalidationjob <job-name> -n {namespace}
 **Diagnosis**:
 [source,bash,role=execute,subs="attributes+"]
 ----
-# Check if models are registered
-PREDICTOR_IP=$(oc get pod -n {namespace} \
-  -l serving.kserve.io/inferenceservice=anomaly-detector \
-  -o jsonpath='{.items[0].status.podIP}')
+# Check model registry
 oc exec -n {namespace} deployment/coordination-engine -- \
-  curl -s "http://${PREDICTOR_IP}:8080/v1/models"
+  curl -s http://localhost:8080/api/v1/models
 
 # Check predictor logs for startup errors
 oc logs -n {namespace} \
