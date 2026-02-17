@@ -119,7 +119,7 @@ EOF
 
 * GPU nodes with `nvidia.com/gpu.present: "true"` label
 * GPU tolerations configured (automatically handled by GPU pipeline)
-* Uses `gpu-training-pvc` (GP3 storage) instead of model-storage-pvc (CephFS)
+* Uses `model-storage-gpu-pvc` (GP3 storage) instead of model-storage-pvc (CephFS)
 
 [TIP]
 ====
@@ -209,14 +209,14 @@ spec:
     volumes:
     - name: model-storage
       persistentVolumeClaim:
-        claimName: gpu-training-pvc
+        claimName: model-storage-gpu-pvc
   timeout: 45m
 EOF
 ----
 
 [NOTE]
 ====
-GPU nodes may not have CephFS drivers. Use `gpu-training-pvc` (GP3 storage class) instead of `model-storage-pvc` (CephFS) for GPU-accelerated training. Copy the model to CephFS after training completes.
+GPU nodes may not have CephFS drivers. Use `model-storage-gpu-pvc` (GP3 storage class) instead of `model-storage-pvc` (CephFS) for GPU-accelerated training. The GPU pipeline automatically copies models from `model-storage-gpu-pvc` to `model-storage-pvc` after training completes.
 ====
 
 == Training Time Windows
@@ -395,7 +395,7 @@ EOF
 **Features**:
 
 * Requires GPU nodes with `nvidia.com/gpu.present: "true"` label
-* Uses `gpu-training-pvc` (GP3 storage - GPU nodes may not have CephFS drivers)
+* Uses `model-storage-gpu-pvc` (GP3 storage - GPU nodes may not have CephFS drivers)
 * Automatic GPU tolerations and nodeSelector
 * Suitable for LSTM, neural networks, deep learning models
 
