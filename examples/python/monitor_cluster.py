@@ -109,7 +109,9 @@ Examples:
   python monitor_cluster.py --server http://ols-server:8000 --namespace default
 
 Environment Variables:
-  OLS_SERVER_URL    Lightspeed server URL (default: http://ols-server:8000)
+  OLS_SERVER_URL    Lightspeed server URL
+                    Inside cluster: http://lightspeed-app-server.openshift-lightspeed.svc:8080
+                    Via port-forward: http://localhost:8080
   NAMESPACE         Namespace to monitor (default: self-healing-platform)
   CHECK_INTERVAL    Check interval in seconds (default: 60)
 
@@ -119,7 +121,7 @@ Press Ctrl+C to stop monitoring.
 
     parser.add_argument(
         '--server',
-        default=os.getenv('OLS_SERVER_URL', 'http://ols-server:8000'),
+        default=os.getenv('OLS_SERVER_URL', 'http://lightspeed-app-server.openshift-lightspeed.svc:8080'),
         help='Lightspeed server URL'
     )
 

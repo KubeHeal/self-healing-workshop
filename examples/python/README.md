@@ -117,6 +117,52 @@ export NAMESPACE="self-healing-platform"
 python monitor_cluster.py
 ```
 
+## Testing
+
+### Run Integration Tests
+
+Test all scripts against your OpenShift Lightspeed instance:
+
+```bash
+# Using the wrapper script (recommended)
+./scripts/test-python-examples.sh
+
+# Or manually in the container
+oc run python-test \
+  --image=image-registry.openshift-image-registry.svc:5000/self-healing-platform/lightspeed-python-examples:latest \
+  -n self-healing-platform \
+  --rm -it -- python test_integration.py
+```
+
+**What gets tested:**
+- Lightspeed service connectivity
+- All script imports and dependencies
+- Command-line help flags
+- Actual query execution against Lightspeed
+
+**Expected output:**
+```
+==================================================
+Lightspeed Python Examples - Integration Test Suite
+==================================================
+
+Testing: Lightspeed connectivity
+Server URL: http://lightspeed-app-server.openshift-lightspeed.svc:8080
+Status code: 200
+✅ PASSED
+
+Testing: lightspeed_client.py query
+✓ Client created
+✓ Query sent
+Response keys: ['answer', 'confidence', 'sources']
+✅ PASSED
+
+TEST SUMMARY
+Passed: 9
+Failed: 0
+Total:  9
+```
+
 ## Running as Jobs and CronJobs
 
 You can also run scripts as Kubernetes Jobs or CronJobs for automation:

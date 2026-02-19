@@ -116,14 +116,16 @@ Examples:
   python pattern_batch_analysis.py --server http://ols-server:8000 --namespace default
 
 Environment Variables:
-  OLS_SERVER_URL    Lightspeed server URL (default: http://ols-server:8000)
+  OLS_SERVER_URL    Lightspeed server URL
+                    Inside cluster: http://lightspeed-app-server.openshift-lightspeed.svc:8080
+                    Via port-forward: http://localhost:8080
   NAMESPACE         Namespace to analyze (default: self-healing-platform)
         """
     )
 
     parser.add_argument(
         '--server',
-        default=os.getenv('OLS_SERVER_URL', 'http://ols-server:8000'),
+        default=os.getenv('OLS_SERVER_URL', 'http://lightspeed-app-server.openshift-lightspeed.svc:8080'),
         help='Lightspeed server URL'
     )
 

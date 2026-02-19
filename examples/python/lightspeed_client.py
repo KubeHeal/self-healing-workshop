@@ -120,14 +120,16 @@ Examples:
   python lightspeed_client.py --server http://ols-server:8000
 
 Environment Variables:
-  OLS_SERVER_URL    Lightspeed server URL (default: http://ols-server:8000)
+  OLS_SERVER_URL    Lightspeed server URL
+                  Inside cluster: http://lightspeed-app-server.openshift-lightspeed.svc:8080
+                  Via port-forward: http://localhost:8080
   NAMESPACE         Default namespace for queries (default: self-healing-platform)
         """
     )
 
     parser.add_argument(
         '--server',
-        default=os.getenv('OLS_SERVER_URL', 'http://ols-server:8000'),
+        default=os.getenv('OLS_SERVER_URL', 'http://lightspeed-app-server.openshift-lightspeed.svc:8080'),
         help='Lightspeed server URL'
     )
 
