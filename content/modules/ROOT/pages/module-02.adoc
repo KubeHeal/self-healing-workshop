@@ -934,7 +934,26 @@ Lightspeed: "✅ Cluster Health Summary for self-healing-platform:
 
 == Part 7: LightspeedClient Python API (Optional)
 
-For programmatic access, you can use the LightspeedClient:
+For programmatic access, you can use the LightspeedClient.
+
+=== Download Ready-to-Use Scripts
+
+All Python examples in this section are available as downloadable, runnable scripts:
+
+[source,bash,role=execute]
+----
+# Download the LightspeedClient library
+curl -O https://raw.githubusercontent.com/KubeHeal/self-healing-workshop/main/examples/python/lightspeed_client.py
+
+# Download dependencies
+curl -O https://raw.githubusercontent.com/KubeHeal/self-healing-workshop/main/examples/python/requirements.txt
+pip install -r requirements.txt
+
+# Run the example
+python lightspeed_client.py --help
+----
+
+Or browse all examples in the repository: https://github.com/KubeHeal/self-healing-workshop/tree/main/examples/python[GitHub Examples Directory^]
 
 === Basic Usage
 
@@ -1076,6 +1095,31 @@ print(f"Recommendations: {insights['recommendations']}")
 
 == Part 9: Integration Patterns (Optional)
 
+=== Download Integration Pattern Scripts
+
+All integration patterns are available as ready-to-run scripts:
+
+[source,bash,role=execute]
+----
+# Download all integration patterns
+curl -O https://raw.githubusercontent.com/KubeHeal/self-healing-workshop/main/examples/python/pattern_alert_response.py
+curl -O https://raw.githubusercontent.com/KubeHeal/self-healing-workshop/main/examples/python/pattern_batch_analysis.py
+curl -O https://raw.githubusercontent.com/KubeHeal/self-healing-workshop/main/examples/python/pattern_capacity_planning.py
+
+# These patterns require the LightspeedClient library
+curl -O https://raw.githubusercontent.com/KubeHeal/self-healing-workshop/main/examples/python/lightspeed_client.py
+
+# Install dependencies
+pip install requests pandas
+
+# Run examples
+python pattern_alert_response.py --help
+python pattern_batch_analysis.py --namespace self-healing-platform
+python pattern_capacity_planning.py --output report.json
+----
+
+View all scripts: https://github.com/KubeHeal/self-healing-workshop/tree/main/examples/python[GitHub Examples Directory^]
+
 === Pattern 1: Automated Alert Response
 
 [source,python]
@@ -1192,7 +1236,50 @@ def generate_capacity_report(namespace: str) -> dict:
 
 == Part 10: Hands-On Exercise (Optional)
 
-Let's create a simple monitoring script:
+Let's create a simple monitoring script that continuously checks cluster health.
+
+=== Quick Start: Download and Run
+
+The easiest way to get started is to download the ready-to-use monitoring script:
+
+[source,bash,role=execute]
+----
+# Download the monitoring script
+curl -O https://raw.githubusercontent.com/KubeHeal/self-healing-workshop/main/examples/python/monitor_cluster.py
+
+# Install dependencies if needed
+pip install requests
+
+# Run the monitor (adjust URL and namespace as needed)
+export OLS_SERVER_URL=http://ols-server:8000
+export NAMESPACE=self-healing-platform
+python monitor_cluster.py --help
+
+# Start monitoring (checks every 60 seconds)
+python monitor_cluster.py
+----
+
+**Expected output:**
+[source]
+----
+======================================================================
+OpenShift Lightspeed Cluster Health Monitor
+======================================================================
+Server URL: http://ols-server:8000
+Namespace: self-healing-platform
+Check interval: 60 seconds
+======================================================================
+
+[2026-02-19 14:30:00] Checking cluster health...
+  ✅ All systems healthy
+     The self-healing-platform namespace is running smoothly...
+----
+
+Press `Ctrl+C` to stop monitoring.
+
+=== Alternative: Create the Script Manually
+
+If you prefer to create the script yourself, here's the complete code:
 
 === Create the Script
 
