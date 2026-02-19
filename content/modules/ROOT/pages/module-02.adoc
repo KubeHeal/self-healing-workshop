@@ -423,8 +423,8 @@ spec:
         credentialsSecretRef:
           name: openai-api-key
         models:
+          - name: gpt-5-mini
           - name: gpt-4o
-          - name: gpt-4o-mini
 
   mcpServers:
     - name: cluster-health
@@ -434,7 +434,7 @@ spec:
         enableSSE: true
 
   ols:
-    defaultModel: gpt-4o-mini
+    defaultModel: gpt-5-mini
     defaultProvider: openai
     deployment:
       replicas: 1
@@ -670,15 +670,15 @@ spec:
   # LLM Provider configuration (configure one or multiple)
   llm:
     providers:
-      # OpenAI (GPT-4, GPT-4o, GPT-4o-mini)
+      # OpenAI (GPT-5, GPT-4o)
       - name: openai
         type: openai
         url: "https://api.openai.com/v1"
         credentialsSecretRef:
           name: openai-api-key
         models:
-          - name: gpt-4o           # Latest multimodal model
-          - name: gpt-4o-mini      # Cost-efficient default
+          - name: gpt-5-mini       # Latest efficient model (default)
+          - name: gpt-4o           # Previous generation multimodal
           - name: gpt-4            # Stable baseline
 
       # Google Gemini (OpenAI-compatible endpoint)
@@ -729,7 +729,7 @@ spec:
 
   # OLS deployment configuration
   ols:
-    defaultModel: gpt-4o-mini      # Choose your default model
+    defaultModel: gpt-5-mini        # Choose your default model
     defaultProvider: openai         # Choose your default provider
     deployment:
       replicas: 1
@@ -764,7 +764,7 @@ oc get olsconfig cluster -o jsonpath='{.spec.mcpServers[*].name}' && echo
 |**OpenAI**
 |`openai`
 |API key in secret
-|GPT-4o, GPT-4o-mini recommended
+|GPT-5-mini, GPT-4o recommended
 
 |**Google Gemini**
 |`openai`
