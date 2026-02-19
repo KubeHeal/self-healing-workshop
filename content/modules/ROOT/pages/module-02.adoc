@@ -7,7 +7,7 @@ This module is **REQUIRED** before the End-to-End Self-Healing demo. You'll depl
 **What you'll accomplish:**
 
 * Deploy the Cluster Health MCP Server
-* Configure LLM provider (OpenAI, Google Gemini, or Anthropic)
+* Configure LLM provider (OpenAI, existing Lightspeed, or vLLM)
 * Create OLSConfig to connect Lightspeed to MCP Server
 * Verify the integration is working
 * Learn the 7 MCP tools available for cluster management
@@ -23,7 +23,7 @@ Before proceeding, ensure:
 
 * ✅ Completed Module 0 and Module 1
 * ✅ Platform is deployed (via AgnosticD workload)
-* ✅ You have an LLM API key (OpenAI, Google Gemini, or Anthropic)
+* ✅ You have an OpenAI API key OR existing Lightspeed cluster OR Hugging Face account
 * ✅ Admin access to the cluster
 
 Verify platform is running:
@@ -75,53 +75,335 @@ oc logs deployment/cluster-health-mcp-server -n {namespace} --tail=20
 
 == Part 2: Configure LLM Provider
 
-OpenShift Lightspeed requires an LLM provider. Choose ONE of the following:
+OpenShift Lightspeed requires an LLM provider. Choose ONE option based on your environment:
 
-=== Option A: OpenAI (Recommended)
+[cols="1,2,2,1"]
+|===
+|Option |Description |Best For |Setup Time
+
+|**A: OpenAI**
+|Use OpenAI's cloud API (manual setup)
+|Quick start, reliable responses
+|~5 min
+
+|**B: Existing Lightspeed**
+|Cluster already has Lightspeed configured
+|Pre-configured environments (Azure, watsonx)
+|~10 min
+
+|**C: Deploy vLLM**
+|Self-host Llama 3.2 1B in your cluster
+|No external dependencies, learning experience
+|~20 min
+|===
+
+=== Option A: OpenAI (Recommended for Quick Start)
+
+**Step A.1: Get OpenAI API Key**
+
+1. Visit https://platform.openai.com/api-keys
+2. Create new API key
+3. Copy the key (starts with `sk-proj-`)
+
+**Step A.2: Create Secret**
 
 [source,bash,role=execute,subs="attributes+"]
 ----
-# Get API key from https://platform.openai.com/api-keys
 oc create secret generic openai-api-key \
   -n openshift-lightspeed \
   --from-literal=apitoken='sk-proj-YOUR_KEY_HERE'
 ----
 
-=== Option B: Google Gemini
+[NOTE]
+====
+Continue to Part 3, Option A for OLSConfig creation.
+====
+
+=== Option B: Existing Lightspeed Cluster
+
+**For clusters with pre-configured Lightspeed** (Azure OpenAI, IBM watsonx, etc.)
+
+**Step B.1: Verify Existing OLSConfig**
 
 [source,bash,role=execute,subs="attributes+"]
 ----
-# Get API key from https://aistudio.google.com/apikey
-# Enable Generative Language API: https://console.cloud.google.com/apis/library/generativelanguage.googleapis.com
-oc create secret generic google-api-key \
-  -n openshift-lightspeed \
-  --from-literal=apitoken='AIzaSy...'
+# Check if OLSConfig exists
+oc get olsconfig cluster -n openshift-lightspeed
+
+# View current configuration
+oc get olsconfig cluster -o yaml | less
 ----
 
-=== Option C: Anthropic Claude
+Look for existing `spec.llm.providers` section showing your LLM provider.
 
-[source,bash,role=execute,subs="attributes+"]
+**Step B.2: Identify Provider Type**
+
+Common configurations:
+
+**Azure OpenAI:**
+[source,yaml]
 ----
-# Get API key from https://console.anthropic.com/
-oc create secret generic anthropic-api-key \
-  -n openshift-lightspeed \
-  --from-literal=apitoken='sk-ant-YOUR_KEY_HERE'
+spec:
+  llm:
+    providers:
+      - name: Azure
+        type: azure_openai
+        url: 'https://your-instance.openai.azure.com/'
+        credentialsSecretRef:
+          name: azure-api-keys
 ----
+
+**IBM watsonx:**
+[source,yaml]
+----
+spec:
+  llm:
+    providers:
+      - name: watsonx
+        type: watsonx
+        url: 'https://us-south.ml.cloud.ibm.com'
+        credentialsSecretRef:
+          name: watsonx-api-keys
+----
+
+[NOTE]
+====
+Your existing LLM configuration will be preserved. We'll only add MCP Server integration in Part 3.
+Continue to Part 3, Option B.
+====
+
+=== Option C: Deploy vLLM (Self-Hosted LLM)
+
+**Deploy vLLM inference server in your cluster** - no external API keys required!
 
 [IMPORTANT]
 ====
-**Secret key MUST be named `apitoken`** (not `apiKey`, `api_key`, etc.). OpenShift Lightspeed validates this and will fail if incorrect.
+**Requirements:**
+- 8Gi+ available memory
+- Persistent storage (10Gi for model caching)
+- Network access to Hugging Face Hub
+- ~10-15 minutes for initial model download
+====
+
+**Step C.1: Accept Llama 3.2 License**
+
+1. Visit https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct
+2. Sign in to Hugging Face (create account if needed)
+3. Click "Agree and access repository"
+4. Create access token: https://huggingface.co/settings/tokens
+   - Token type: Read
+   - Copy the token (starts with `hf_`)
+
+**Step C.2: Create Hugging Face Token Secret**
+
+[source,bash,role=execute,subs="attributes+"]
+----
+# Replace with your actual token
+oc create secret generic huggingface-token \
+  -n {namespace} \
+  --from-literal=token='hf_YOUR_TOKEN_HERE'
+----
+
+**Step C.3: Deploy vLLM Server**
+
+[source,bash,role=execute,subs="attributes+"]
+----
+cat <<EOF | oc apply -f -
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vllm-model-cache
+  namespace: {namespace}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm-server
+  namespace: {namespace}
+  labels:
+    app: vllm-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vllm-server
+  template:
+    metadata:
+      labels:
+        app: vllm-server
+    spec:
+      containers:
+      - name: vllm
+        image: quay.io/vllm/vllm-openai:latest
+        command:
+          - python3
+          - -m
+          - vllm.entrypoints.openai.api_server
+          - --model
+          - meta-llama/Llama-3.2-1B-Instruct
+          - --port
+          - "8000"
+          - --host
+          - "0.0.0.0"
+        env:
+        - name: HUGGING_FACE_HUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: huggingface-token
+              key: token
+        - name: HF_HOME
+          value: "/models"
+        ports:
+        - containerPort: 8000
+          protocol: TCP
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "2"
+          limits:
+            memory: "8Gi"
+            cpu: "4"
+        volumeMounts:
+        - name: model-cache
+          mountPath: /models
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 300
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 320
+          periodSeconds: 30
+      volumes:
+      - name: model-cache
+        persistentVolumeClaim:
+          claimName: vllm-model-cache
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vllm-server
+  namespace: {namespace}
+spec:
+  selector:
+    app: vllm-server
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+    name: http
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: vllm-server
+  namespace: {namespace}
+spec:
+  to:
+    kind: Service
+    name: vllm-server
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+EOF
+----
+
+**Step C.4: Monitor vLLM Deployment**
+
+[source,bash,role=execute,subs="attributes+"]
+----
+# Watch pod startup (model download takes 5-10 minutes)
+oc get pods -n {namespace} -l app=vllm-server -w
+----
+
+Open another terminal and watch logs:
+[source,bash,role=execute,subs="attributes+"]
+----
+# Check logs for model download progress
+oc logs -n {namespace} deployment/vllm-server -f
+----
+
+**Expected log output:**
+[source]
+----
+INFO: Downloading meta-llama/Llama-3.2-1B-Instruct...
+INFO: Downloaded 483 MB / 1.2 GB...
+INFO: Model loaded successfully
+INFO: Started server process
+----
+
+**Step C.5: Test vLLM Server**
+
+[source,bash,role=execute,subs="attributes+"]
+----
+# Get the route URL
+VLLM_URL=$(oc get route vllm-server -n {namespace} -o jsonpath='{.spec.host}')
+echo "vLLM URL: https://$VLLM_URL"
+
+# Test with a simple completion
+curl -k https://$VLLM_URL/v1/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "meta-llama/Llama-3.2-1B-Instruct",
+    "prompt": "OpenShift is",
+    "max_tokens": 20
+  }'
+----
+
+**Expected response:**
+[source,json]
+----
+{
+  "id": "cmpl-xxx",
+  "object": "text_completion",
+  "created": 1234567890,
+  "model": "meta-llama/Llama-3.2-1B-Instruct",
+  "choices": [{
+    "text": " a container orchestration platform...",
+    "index": 0,
+    "finish_reason": "length"
+  }]
+}
+----
+
+✅ If you see a valid JSON response with generated text, vLLM is working!
+
+[NOTE]
+====
+Continue to Part 3, Option C for OLSConfig creation.
+====
+
+[IMPORTANT]
+====
+**Secret key name:** The secret key MUST be named `apitoken` for OpenAI (Option A). For vLLM (Option C), the Hugging Face token uses key name `token`.
 ====
 
 == Part 3: Create OLSConfig
 
-The OLSConfig custom resource connects OpenShift Lightspeed to your MCP Server.
+The OLSConfig custom resource connects OpenShift Lightspeed to your LLM provider and MCP Server.
 
-=== Step 3.1: Apply OLSConfig
+[tabs]
+====
+Option A: OpenAI::
++
+--
+**For Option A (Manual OpenAI Setup)**
 
-Choose the configuration that matches your LLM provider:
+**Step A.3: Create OLSConfig**
 
-**For OpenAI:**
 [source,bash,role=execute,subs="attributes+"]
 ----
 cat <<EOF | oc apply -f -
@@ -164,9 +446,86 @@ spec:
 EOF
 ----
 
-**For Google Gemini:**
+Continue to verification steps below.
+--
+
+Option B: Existing Lightspeed::
++
+--
+**For Option B (Existing Lightspeed Cluster)**
+
+Instead of creating a new OLSConfig, we'll **patch** the existing one to add MCP Server integration.
+
+**Step B.3: Backup Current OLSConfig**
+
 [source,bash,role=execute,subs="attributes+"]
 ----
+oc get olsconfig cluster -o yaml > /tmp/olsconfig-backup.yaml
+----
+
+**Step B.4: Add MCP Server Configuration**
+
+[source,bash,role=execute,subs="attributes+"]
+----
+# Add MCPServer feature gate and mcpServers section
+oc patch olsconfig cluster --type=merge -p '
+spec:
+  featureGates:
+    - MCPServer
+  mcpServers:
+    - name: cluster-health
+      streamableHTTP:
+        url: http://cluster-health-mcp-server.{namespace}.svc:3000/mcp
+        timeout: 30
+        enableSSE: true
+'
+----
+
+[IMPORTANT]
+====
+This patch **preserves** your existing LLM provider configuration while adding MCP Server support.
+====
+
+**Step B.5: Verify Merged Configuration**
+
+[source,bash,role=execute,subs="attributes+"]
+----
+# View the updated OLSConfig
+oc get olsconfig cluster -o yaml | less
+
+# Verify both sections exist:
+# 1. Your existing llm.providers (should be unchanged)
+# 2. New mcpServers section (should show cluster-health)
+# 3. featureGates should include MCPServer
+----
+
+Continue to verification steps below.
+--
+
+Option C: vLLM::
++
+--
+**For Option C (Deploy vLLM)**
+
+**Step C.6: Create Dummy API Secret**
+
+vLLM doesn't require authentication, but OLSConfig requires a credentialsSecretRef:
+
+[source,bash,role=execute,subs="attributes+"]
+----
+oc create secret generic vllm-api-key \
+  -n openshift-lightspeed \
+  --from-literal=apitoken='none'
+----
+
+**Step C.7: Create OLSConfig for vLLM**
+
+[source,bash,role=execute,subs="attributes+"]
+----
+# Get vLLM route URL
+VLLM_URL=$(oc get route vllm-server -n {namespace} -o jsonpath='{.spec.host}')
+echo "Using vLLM URL: https://$VLLM_URL"
+
 cat <<EOF | oc apply -f -
 apiVersion: ols.openshift.io/v1alpha1
 kind: OLSConfig
@@ -178,14 +537,13 @@ spec:
 
   llm:
     providers:
-      - name: google-gemini
-        type: openai
-        url: "https://generativelanguage.googleapis.com/v1beta/openai"
+      - name: vllm-local
+        type: rhoai_vllm
+        url: "https://$VLLM_URL/v1"
         credentialsSecretRef:
-          name: google-api-key
+          name: vllm-api-key
         models:
-          - name: gemini-1.5-pro
-          - name: gemini-1.5-flash
+          - name: meta-llama/Llama-3.2-1B-Instruct
 
   mcpServers:
     - name: cluster-health
@@ -195,8 +553,8 @@ spec:
         enableSSE: true
 
   ols:
-    defaultModel: gemini-1.5-flash
-    defaultProvider: google-gemini
+    defaultModel: meta-llama/Llama-3.2-1B-Instruct
+    defaultProvider: vllm-local
     deployment:
       replicas: 1
     conversationCache:
@@ -207,7 +565,16 @@ spec:
 EOF
 ----
 
-=== Step 3.2: Verify OLSConfig
+[NOTE]
+====
+**Provider Type:** We use `rhoai_vllm` for OpenShift AI vLLM integration. This tells Lightspeed to use the vLLM OpenAI-compatible API format.
+====
+
+Continue to verification steps below.
+--
+====
+
+=== Verify OLSConfig (All Options)
 
 [source,bash,role=execute,subs="attributes+"]
 ----
@@ -219,18 +586,29 @@ oc get olsconfig cluster -o jsonpath='{.status.conditions[*].type}' && echo
 oc get olsconfig cluster -o jsonpath='{.status.conditions[*].status}' && echo
 ----
 
-**Expected conditions: ConsolePluginReady, CacheReady, ApiReady = True**
+**Expected conditions:** `ConsolePluginReady`, `CacheReady`, `ApiReady = True`
 
-=== Step 3.3: Verify Lightspeed Pods
+=== Verify Lightspeed Pods
 
 [source,bash,role=execute,subs="attributes+"]
 ----
 oc get pods -n openshift-lightspeed
 ----
 
-Wait for `lightspeed-app-server` to be Running.
+Wait for `lightspeed-app-server` to be Running (~2-3 minutes).
 
 == Part 4: Test the Integration
+
+[NOTE]
+====
+**For vLLM Users (Option C):** Llama 3.2 1B is a smaller model than GPT-4o. Responses may be:
+
+- More concise
+- Occasionally less accurate for complex queries
+- Faster (lower latency)
+
+This is expected behavior - the model is optimized for efficiency over maximum accuracy.
+====
 
 === Step 4.1: Access Lightspeed via Console
 
