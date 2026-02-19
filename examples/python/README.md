@@ -14,35 +14,33 @@ These scripts demonstrate how to programmatically interact with OpenShift Lights
 
 ## Quick Start
 
-### 1. Install Dependencies
+**Run the pre-built container with all scripts and dependencies included:**
 
 ```bash
-pip install -r requirements.txt
-```
+# Run an interactive container
+oc run lightspeed-examples \
+  --image=image-registry.openshift-image-registry.svc:5000/self-healing-platform/lightspeed-python-examples:latest \
+  --rm -it -- bash
 
-### 2. Set Environment Variables
-
-```bash
-# Lightspeed server URL (adjust based on your deployment)
-export OLS_SERVER_URL="http://ols-server:8000"
-
-# Target namespace for cluster operations
-export NAMESPACE="self-healing-platform"
-```
-
-### 3. Run Examples
-
-```bash
-# Test the LightspeedClient library
-python lightspeed_client.py
-
-# Test integration patterns
-python pattern_alert_response.py
-python pattern_batch_analysis.py
-python pattern_capacity_planning.py
-
-# Run the monitoring script
+# Inside the container, all scripts are ready to use:
+python lightspeed_client.py --help
 python monitor_cluster.py
+python pattern_alert_response.py
+```
+
+**Or run a specific script directly:**
+
+```bash
+# Run the monitoring script
+oc run lightspeed-monitor \
+  --image=image-registry.openshift-image-registry.svc:5000/self-healing-platform/lightspeed-python-examples:latest \
+  --rm -it -- python monitor_cluster.py
+
+# Run with custom parameters
+oc run lightspeed-monitor \
+  --image=image-registry.openshift-image-registry.svc:5000/self-healing-platform/lightspeed-python-examples:latest \
+  --env="NAMESPACE=my-namespace" \
+  --rm -it -- python monitor_cluster.py --interval 30
 ```
 
 ## Scripts
@@ -116,25 +114,56 @@ export NAMESPACE="self-healing-platform"
 python monitor_cluster.py
 ```
 
-## Running in OpenShift
+## Running as Jobs and CronJobs
 
-You can run these scripts inside OpenShift pods:
+You can also run scripts as Kubernetes Jobs or CronJobs for automation:
+
+### Method 1: Job for One-Time Execution
 
 ```bash
-# Create a pod with Python
-oc run python-client --image=python:3.11 --rm -it -- bash
+# Create a Job that runs the monitoring script
+cat <<EOF | oc apply -f -
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: lightspeed-monitor
+  namespace: self-healing-platform
+spec:
+  template:
+    spec:
+      containers:
+      - name: monitor
+        image: image-registry.openshift-image-registry.svc:5000/self-healing-platform/lightspeed-python-examples:latest
+        command: ["python", "monitor_cluster.py", "--interval", "30"]
+      restartPolicy: Never
+  backoffLimit: 1
+EOF
 
-# Inside the pod:
-curl -O https://raw.githubusercontent.com/KubeHeal/self-healing-workshop/main/examples/python/lightspeed_client.py
-curl -O https://raw.githubusercontent.com/KubeHeal/self-healing-workshop/main/examples/python/requirements.txt
-pip install -r requirements.txt
+# View logs
+oc logs -f job/lightspeed-monitor -n self-healing-platform
+```
 
-# Set environment variables
-export OLS_SERVER_URL="http://ols-server.openshift-lightspeed.svc:8000"
-export NAMESPACE="self-healing-platform"
+### Method 2: CronJob for Scheduled Execution
 
-# Run scripts
-python lightspeed_client.py
+```bash
+cat <<EOF | oc apply -f -
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: capacity-planning
+  namespace: self-healing-platform
+spec:
+  schedule: "0 */6 * * *"  # Every 6 hours
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: report
+            image: image-registry.openshift-image-registry.svc:5000/self-healing-platform/lightspeed-python-examples:latest
+            command: ["python", "pattern_capacity_planning.py", "--output", "/tmp/report.json"]
+          restartPolicy: OnFailure
+EOF
 ```
 
 ## Configuration
@@ -160,40 +189,94 @@ python pattern_batch_analysis.py --help
 
 ## Troubleshooting
 
+### Container Image Not Found
+
+```
+Error: ImagePullBackOff or ErrImagePull
+```
+
+**Cause:** The container image hasn't been built yet or doesn't exist in the registry.
+
+**Solution:** Check if the image exists and trigger a build if needed:
+
+```bash
+# Check if ImageStream exists
+oc get imagestream lightspeed-python-examples -n self-healing-platform
+
+# Check if build completed
+oc get builds -n self-healing-platform | grep lightspeed-python-examples
+
+# Trigger a new build if needed
+oc start-build lightspeed-python-examples -n self-healing-platform --wait
+```
+
 ### Connection Refused
 
 ```
-Error: Connection refused to http://ols-server:8000
+Error: Connection refused to http://lightspeed-app-server:8080
 ```
 
-**Solution:** Verify Lightspeed server is running and accessible:
+**Cause:** The Lightspeed service is not running or not accessible.
+
+**Solution:** Verify the Lightspeed service is running:
 
 ```bash
+# Check Lightspeed pods
 oc get pods -n openshift-lightspeed
-oc get service ols-server -n openshift-lightspeed
+
+# Check service exists
+oc get service lightspeed-app-server -n openshift-lightspeed
+
+# Get service endpoint
+oc get endpoints lightspeed-app-server -n openshift-lightspeed
 ```
 
-If running outside the cluster, use port-forward:
+### Script Errors
+
+If scripts fail with errors, check the container logs:
 
 ```bash
-oc port-forward -n openshift-lightspeed svc/ols-server 8000:8000
-```
+# Run container with bash to debug
+oc run lightspeed-debug \
+  --image=image-registry.openshift-image-registry.svc:5000/self-healing-platform/lightspeed-python-examples:latest \
+  --rm -it -- bash
 
-### Module Not Found
-
-```
-ModuleNotFoundError: No module named 'requests'
-```
-
-**Solution:** Install dependencies:
-
-```bash
-pip install -r requirements.txt
+# Inside container, test individual components
+python -c "import requests; print('requests OK')"
+python -c "import pandas; print('pandas OK')"
+python lightspeed_client.py --help
 ```
 
 ### Authentication Errors
 
 These scripts connect to the internal Lightspeed server, which doesn't require authentication. If you're connecting to an external Lightspeed instance, you may need to add authentication headers.
+
+## Advanced: Build Your Own Container
+
+If you want to modify the scripts and build your own container:
+
+```bash
+# Clone the repository
+git clone https://github.com/KubeHeal/self-healing-workshop.git
+cd self-healing-workshop/examples/python
+
+# Build with Docker/Podman
+podman build -t lightspeed-examples:custom -f Containerfile .
+
+# Push to OpenShift internal registry
+podman tag lightspeed-examples:custom image-registry.openshift-image-registry.svc:5000/self-healing-platform/lightspeed-examples:custom
+podman push image-registry.openshift-image-registry.svc:5000/self-healing-platform/lightspeed-examples:custom
+
+# Or use OpenShift BuildConfig
+oc apply -f openshift/imagestream.yaml
+oc apply -f openshift/buildconfig.yaml
+oc start-build lightspeed-python-examples --wait
+
+# Run your custom container
+oc run lightspeed-examples \
+  --image=image-registry.openshift-image-registry.svc:5000/self-healing-platform/lightspeed-python-examples:latest \
+  --rm -it -- bash
+```
 
 ## Workshop Documentation
 

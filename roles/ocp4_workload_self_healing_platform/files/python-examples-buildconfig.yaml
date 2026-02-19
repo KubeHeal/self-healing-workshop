@@ -1,0 +1,21 @@
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: lightspeed-python-examples
+spec:
+  output:
+    to:
+      kind: ImageStreamTag
+      name: lightspeed-python-examples:latest
+  source:
+    type: Git
+    git:
+      uri: https://github.com/KubeHeal/self-healing-workshop.git
+      ref: main
+    contextDir: examples/python
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Containerfile
+  triggers:
+    - type: ConfigChange

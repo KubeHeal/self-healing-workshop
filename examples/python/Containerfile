@@ -1,0 +1,24 @@
+FROM python:3.11-slim
+
+LABEL maintainer="Self-Healing Workshop"
+LABEL description="Python examples for OpenShift Lightspeed integration"
+
+WORKDIR /app
+
+# Copy requirements and install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy all Python scripts
+COPY *.py .
+COPY README.md .
+
+# Set default environment variables (can be overridden)
+ENV OLS_SERVER_URL="http://lightspeed-app-server.openshift-lightspeed.svc:8080"
+ENV NAMESPACE="self-healing-platform"
+
+# Make scripts executable
+RUN chmod +x *.py
+
+# Default command shows available scripts
+CMD ["sh", "-c", "echo 'Available scripts:' && ls -1 *.py && echo '\nUsage: python <script-name> --help'"]

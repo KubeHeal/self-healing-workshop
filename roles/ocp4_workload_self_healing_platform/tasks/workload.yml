@@ -216,6 +216,52 @@
   delay: 10
   failed_when: false
 
+# Deploy Python examples container build
+- name: Workload | Create Python examples ImageStream
+  kubernetes.core.k8s:
+    state: present
+    namespace: "{{ self_healing_platform_namespace }}"
+    definition: "{{ lookup('file', 'python-examples-imagestream.yaml') }}"
+
+- name: Workload | Create Python examples BuildConfig
+  kubernetes.core.k8s:
+    state: present
+    namespace: "{{ self_healing_platform_namespace }}"
+    definition: "{{ lookup('file', 'python-examples-buildconfig.yaml') }}"
+
+- name: Workload | Trigger Python examples build
+  kubernetes.core.k8s:
+    state: present
+    namespace: "{{ self_healing_platform_namespace }}"
+    definition:
+      apiVersion: build.openshift.io/v1
+      kind: BuildRequest
+      metadata:
+        name: lightspeed-python-examples
+  register: r_python_build_trigger
+  failed_when: false
+
+- name: Workload | Wait for Python examples build to complete
+  kubernetes.core.k8s_info:
+    api_version: build.openshift.io/v1
+    kind: Build
+    namespace: "{{ self_healing_platform_namespace }}"
+    label_selectors:
+      - "buildconfig=lightspeed-python-examples"
+  register: r_python_build
+  until:
+    - r_python_build.resources | length > 0
+    - r_python_build.resources[0].status.phase is defined
+    - r_python_build.resources[0].status.phase in ['Complete', 'Failed']
+  retries: 30
+  delay: 10
+  failed_when: false
+
+- name: Workload | Log Python examples build status
+  ansible.builtin.debug:
+    msg: "Python examples container build status: {{ r_python_build.resources[0].status.phase | default('Not started') }}"
+  when: r_python_build.resources | length > 0
+
 # Deploy OpenShift Lightspeed if requested
 - name: Workload | Deploy OpenShift Lightspeed
   when: self_healing_platform_deploy_lightspeed | default(false) | bool
