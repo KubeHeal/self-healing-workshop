@@ -20,6 +20,7 @@ These scripts demonstrate how to programmatically interact with OpenShift Lights
 # Run an interactive container
 oc run lightspeed-examples \
   --image=image-registry.openshift-image-registry.svc:5000/self-healing-platform/lightspeed-python-examples:latest \
+  -n self-healing-platform \
   --rm -it -- bash
 
 # Inside the container, all scripts are ready to use:
@@ -34,11 +35,13 @@ python pattern_alert_response.py
 # Run the monitoring script
 oc run lightspeed-monitor \
   --image=image-registry.openshift-image-registry.svc:5000/self-healing-platform/lightspeed-python-examples:latest \
+  -n self-healing-platform \
   --rm -it -- python monitor_cluster.py
 
 # Run with custom parameters
 oc run lightspeed-monitor \
   --image=image-registry.openshift-image-registry.svc:5000/self-healing-platform/lightspeed-python-examples:latest \
+  -n self-healing-platform \
   --env="NAMESPACE=my-namespace" \
   --rm -it -- python monitor_cluster.py --interval 30
 ```
@@ -239,6 +242,7 @@ If scripts fail with errors, check the container logs:
 # Run container with bash to debug
 oc run lightspeed-debug \
   --image=image-registry.openshift-image-registry.svc:5000/self-healing-platform/lightspeed-python-examples:latest \
+  -n self-healing-platform \
   --rm -it -- bash
 
 # Inside container, test individual components
@@ -275,6 +279,7 @@ oc start-build lightspeed-python-examples --wait
 # Run your custom container
 oc run lightspeed-examples \
   --image=image-registry.openshift-image-registry.svc:5000/self-healing-platform/lightspeed-python-examples:latest \
+  -n self-healing-platform \
   --rm -it -- bash
 ```
 

@@ -950,6 +950,7 @@ The container image was automatically built during platform deployment and is re
 # Run the container interactively
 oc run lightspeed-examples \
   --image=image-registry.openshift-image-registry.svc:5000/{namespace}/lightspeed-python-examples:latest \
+  -n {namespace} \
   --rm -it -- bash
 
 # Inside the container, scripts are ready to use
@@ -1108,6 +1109,7 @@ Use the container image to run integration patterns:
 # Run the container
 oc run lightspeed-examples \
   --image=image-registry.openshift-image-registry.svc:5000/{namespace}/lightspeed-python-examples:latest \
+  -n {namespace} \
   --rm -it -- bash
 
 # Inside the container, run patterns
@@ -1245,6 +1247,7 @@ Run the cluster monitoring script using the container image:
 # Run the monitoring script (press Ctrl+C to stop)
 oc run lightspeed-monitor \
   --image=image-registry.openshift-image-registry.svc:5000/{namespace}/lightspeed-python-examples:latest \
+  -n {namespace} \
   --rm -it -- python monitor_cluster.py
 ----
 
@@ -1274,6 +1277,7 @@ You can also run the container interactively to explore all scripts:
 ----
 oc run lightspeed-examples \
   --image=image-registry.openshift-image-registry.svc:5000/{namespace}/lightspeed-python-examples:latest \
+  -n {namespace} \
   --rm -it -- bash
 ----
 ====
