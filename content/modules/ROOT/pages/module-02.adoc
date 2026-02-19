@@ -650,93 +650,186 @@ You should see `Tool invoked:` messages when Lightspeed uses MCP tools.
 
 == Part 5: Understanding OLSConfig
 
-== Part 5: Understanding OLSConfig
-
 Now that Lightspeed is working, let's understand the OLSConfig in detail.
 
-=== OLSConfig Structure
+=== Complete OLSConfig Reference
+
+The OLSConfig is a **cluster-scoped singleton** that configures OpenShift Lightspeed. Here's a comprehensive example showing all supported provider types:
 
 [source,yaml]
 ----
 apiVersion: ols.openshift.io/v1alpha1
 kind: OLSConfig
 metadata:
-  name: cluster
-  namespace: openshift-lightspeed
+  name: cluster  # MUST be 'cluster' (cluster-scoped singleton)
 spec:
+  # Enable MCP Server integration
+  featureGates:
+    - MCPServer
+
+  # LLM Provider configuration (configure one or multiple)
   llm:
     providers:
+      # OpenAI (GPT-4, GPT-4o, GPT-4o-mini)
       - name: openai
         type: openai
-        url: https://api.openai.com/v1
-        credentials:
-          secretRef:
-            name: openai-credentials
-            namespace: openshift-lightspeed
-    model: gpt-4
-    temperature: 0.7
-    max_tokens: 2000
-  rag:
+        url: "https://api.openai.com/v1"
+        credentialsSecretRef:
+          name: openai-api-key
+        models:
+          - name: gpt-4o           # Latest multimodal model
+          - name: gpt-4o-mini      # Cost-efficient default
+          - name: gpt-4            # Stable baseline
+
+      # Google Gemini (OpenAI-compatible endpoint)
+      - name: google
+        type: openai
+        url: "https://generativelanguage.googleapis.com/v1beta/openai"
+        credentialsSecretRef:
+          name: google-api-key
+        models:
+          - name: gemini-2.0-flash-exp  # Fast & efficient
+          - name: gemini-1.5-pro        # Advanced reasoning
+
+      # Azure OpenAI
+      - name: azure
+        type: azure_openai
+        url: "https://YOUR_RESOURCE.openai.azure.com"
+        credentialsSecretRef:
+          name: azure-openai-key
+        models:
+          - name: gpt-4o           # Requires matching deployment name
+          - name: gpt-4o-mini      # High efficiency
+
+      # IBM watsonx (BAM)
+      - name: watsonx
+        type: watsonx
+        url: "https://us-south.ml.cloud.ibm.com"
+        credentialsSecretRef:
+          name: watsonx-api-key
+        models:
+          - name: ibm/granite-13b-chat-v2  # Enterprise model
+
+      # vLLM (Self-hosted - RHOAI integration)
+      - name: vllm-local
+        type: rhoai_vllm
+        url: "https://vllm-server-{namespace}.apps.cluster.example.com/v1"
+        credentialsSecretRef:
+          name: vllm-api-key
+        models:
+          - name: meta-llama/Llama-3.2-1B-Instruct  # Self-hosted
+
+  # MCP Server configuration (integrates with self-healing platform)
+  mcpServers:
+    - name: cluster-health
+      streamableHTTP:
+        url: http://cluster-health-mcp-server.{namespace}.svc:3000/mcp
+        timeout: 30
+        enableSSE: true
+
+  # OLS deployment configuration
+  ols:
+    defaultModel: gpt-4o-mini      # Choose your default model
+    defaultProvider: openai         # Choose your default provider
+    deployment:
+      replicas: 1
+    conversationCache:
+      type: postgres                # REQUIRED: Only 'postgres' is supported
+
+  # Console plugin configuration
+  console:
     enabled: true
-    vectorstore:
-      type: elasticsearch
-      url: https://elasticsearch:9200
-  logging:
-    level: INFO
-    format: json
 ----
 
 === View Current Configuration
 
 [source,bash,role=execute,subs="attributes+"]
 ----
+# View the complete OLSConfig
 oc get olsconfig cluster -o yaml
+
+# View just the LLM providers
+oc get olsconfig cluster -o jsonpath='{.spec.llm.providers[*].name}' && echo
+
+# View MCP servers
+oc get olsconfig cluster -o jsonpath='{.spec.mcpServers[*].name}' && echo
 ----
 
-=== Supported LLM Providers
+=== Supported LLM Provider Types
 
-[cols="1,2,2"]
+[cols="1,1,2,2"]
 |===
-|Provider |Type |Notes
+|Provider |Type Value |Authentication |Notes
 
 |**OpenAI**
 |`openai`
-|GPT-4, GPT-4-turbo recommended
+|API key in secret
+|GPT-4o, GPT-4o-mini recommended
 
 |**Google Gemini**
-|`gemini`
-|Gemini Pro, Gemini Ultra
-
-|**Anthropic Claude**
-|`anthropic`
-|Claude 3 Opus, Sonnet, Haiku
-
-|**IBM BAM**
-|`ibm_bam`
-|IBM internal models
+|`openai`
+|API key in secret
+|Uses OpenAI-compatible endpoint
 
 |**Azure OpenAI**
 |`azure_openai`
-|Azure-hosted OpenAI models
+|API key + endpoint
+|Requires Azure deployment name
+
+|**IBM watsonx**
+|`watsonx`
+|API key
+|Granite models for enterprise
+
+|**vLLM (RHOAI)**
+|`rhoai_vllm`
+|Optional (dummy secret)
+|Self-hosted, no external API
+
+|**IBM BAM**
+|`bam`
+|API key
+|IBM Research platform
 |===
 
-=== Creating LLM Provider Secrets
+=== Secret Format Requirements
 
-**For OpenAI:**
+All LLM provider secrets must use the key name **`apitoken`**:
+
 [source,bash,role=execute,subs="attributes+"]
 ----
-oc create secret generic openai-credentials \
+# Correct format
+oc create secret generic openai-api-key \
   -n openshift-lightspeed \
-  --from-literal=api_key='your-api-key-here'
+  --from-literal=apitoken='sk-proj-...'
+
+# WRONG - will fail validation
+oc create secret generic openai-api-key \
+  -n openshift-lightspeed \
+  --from-literal=api_key='sk-proj-...'  # ❌ Wrong key name
 ----
 
-**For Google Gemini:**
-[source,bash,role=execute,subs="attributes+"]
-----
-oc create secret generic gemini-credentials \
-  -n openshift-lightspeed \
-  --from-literal=api_key='your-gemini-key-here'
-----
+=== Key Configuration Points
+
+**Cluster-scoped singleton:**
+- OLSConfig name MUST be `cluster`
+- Only one OLSConfig can exist per cluster
+- No namespace field in metadata
+
+**MCP Server integration:**
+- Requires `MCPServer` feature gate
+- Uses internal service URL for cluster-health MCP server
+- Timeout of 30 seconds recommended for ML model calls
+
+**Conversation cache:**
+- Only `postgres` type is supported
+- Automatically provisioned by Lightspeed operator
+- Stores conversation history for context
+
+**Multiple providers:**
+- Configure multiple providers for redundancy
+- Set `defaultProvider` and `defaultModel` for primary use
+- Users can switch providers via console UI
 
 == Part 6: The 7 MCP Tools
 
