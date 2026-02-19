@@ -33,7 +33,7 @@ oc get pods -n {namespace}
 oc get inferenceservices -n {namespace}
 ----
 
-== Part 1: Deploy the MCP Server
+== Part 1: Verify the MCP Server
 
 The MCP (Model Context Protocol) Server enables OpenShift Lightspeed to interact with your self-healing platform.
 
@@ -43,8 +43,18 @@ The MCP Server should already be deployed by the AgnosticD workload:
 
 [source,bash,role=execute,subs="attributes+"]
 ----
-oc get deployment cluster-health-mcp-server -n {namespace}
-oc get service cluster-health-mcp-server -n {namespace}
+oc get deployment mcp-server -n {namespace}
+oc get service mcp-server -n {namespace}
+----
+
+**Expected output:**
+[source]
+----
+NAME         READY   UP-TO-DATE   AVAILABLE   AGE
+mcp-server   1/1     1            1           2d
+
+NAME         TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)    AGE
+mcp-server   ClusterIP   172.30.118.176   <none>        8080/TCP   2d
 ----
 
 === Step 1.2: Check MCP Server Health
@@ -53,25 +63,38 @@ oc get service cluster-health-mcp-server -n {namespace}
 ----
 oc run test-curl --image=registry.access.redhat.com/ubi9/ubi-minimal:latest \
   --rm -i --restart=Never -n {namespace} -- \
-  curl -s http://cluster-health-mcp-server:3000/health
+  curl -s http://mcp-server:8080/health
 ----
 
 **Expected output:**
-[source,json]
+[source]
 ----
-{
-  "status": "healthy",
-  "mcpServer": "cluster-health",
-  "version": "1.0.0"
-}
+OK
 ----
 
 === Step 1.3: View MCP Server Logs
 
+Check the MCP server logs to see registered tools and resources:
+
 [source,bash,role=execute,subs="attributes+"]
 ----
-oc logs deployment/cluster-health-mcp-server -n {namespace} --tail=20
+oc logs deployment/mcp-server -n {namespace} --tail=30
 ----
+
+**Expected log output:**
+[source]
+----
+2026/02/19 14:34:01 Total tools registered: 12
+2026/02/19 14:34:01 Total resources registered: 4
+2026/02/19 14:34:01 Total prompts registered: 6
+2026/02/19 14:34:01 MCP Server initialized: openshift-cluster-health v0.1.0
+2026/02/19 14:34:01 MCP Server listening on 0.0.0.0:8080
+----
+
+[NOTE]
+====
+The MCP Server provides **12 tools**, **4 resources**, and **6 prompts** that Lightspeed can use for cluster management. You'll learn about these in Part 6.
+====
 
 == Part 2: Configure LLM Provider
 
@@ -429,7 +452,7 @@ spec:
   mcpServers:
     - name: cluster-health
       streamableHTTP:
-        url: http://cluster-health-mcp-server.{namespace}.svc:3000/mcp
+        url: http://mcp-server.{namespace}.svc:8080/mcp
         timeout: 30
         enableSSE: true
 
@@ -475,7 +498,7 @@ spec:
   mcpServers:
     - name: cluster-health
       streamableHTTP:
-        url: http://cluster-health-mcp-server.{namespace}.svc:3000/mcp
+        url: http://mcp-server.{namespace}.svc:8080/mcp
         timeout: 30
         enableSSE: true
 '
@@ -548,7 +571,7 @@ spec:
   mcpServers:
     - name: cluster-health
       streamableHTTP:
-        url: http://cluster-health-mcp-server.{namespace}.svc:3000/mcp
+        url: http://mcp-server.{namespace}.svc:8080/mcp
         timeout: 30
         enableSSE: true
 
@@ -643,7 +666,7 @@ Watch MCP Server logs while asking questions:
 
 [source,bash,role=execute,subs="attributes+"]
 ----
-oc logs -f deployment/cluster-health-mcp-server -n {namespace}
+oc logs -f deployment/mcp-server -n {namespace}
 ----
 
 You should see `Tool invoked:` messages when Lightspeed uses MCP tools.
@@ -723,7 +746,7 @@ spec:
   mcpServers:
     - name: cluster-health
       streamableHTTP:
-        url: http://cluster-health-mcp-server.{namespace}.svc:3000/mcp
+        url: http://mcp-server.{namespace}.svc:8080/mcp
         timeout: 30
         enableSSE: true
 
