@@ -38,6 +38,7 @@ class LightspeedClient:
         self.server_url = server_url.rstrip('/')
         self.timeout = timeout
         self.session = requests.Session()
+        self.session.verify = False  # Disable SSL verification for self-signed certs
 
     def query(self, question: str, context: Dict[str, Any] = None) -> Dict[str, Any]:
         """

@@ -35,6 +35,7 @@ oc run python-integration-test \
     -n "${NAMESPACE}" \
     --rm -it \
     --restart=Never \
+    --env="OLS_SERVER_URL=https://lightspeed-app-server.openshift-lightspeed.svc.cluster.local:8443" \
     -- python test_integration.py
 
 echo ""

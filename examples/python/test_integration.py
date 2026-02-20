@@ -63,9 +63,9 @@ def test_lightspeed_connectivity():
     """Test 1: Verify Lightspeed service is reachable"""
     print(f"Server URL: {OLS_SERVER_URL}")
 
-    # Try to connect
+    # Try to connect (disable SSL verification for self-signed certs)
     try:
-        response = requests.get(f"{OLS_SERVER_URL}/health", timeout=5)
+        response = requests.get(f"{OLS_SERVER_URL}/health", timeout=5, verify=False)
         print(f"Status code: {response.status_code}")
         assert response.status_code in [200, 404], f"Unexpected status: {response.status_code}"
     except requests.exceptions.ConnectionError:
