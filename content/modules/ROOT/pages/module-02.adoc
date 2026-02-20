@@ -649,26 +649,85 @@ This is expected behavior - the model is optimized for efficiency over maximum a
 The Lightspeed chatbot appears as a floating panel on the right side of the console. You can minimize it when not in use and expand it again by clicking the icon.
 ====
 
-=== Step 4.2: Test Cluster Health Queries
+=== Step 4.2: Deploy Optional Sample Application (Recommended)
+
+To make testing more interactive, let's deploy a simple sample application that you can query with Lightspeed.
+
+[source,bash,role=execute,subs="attributes+"]
+----
+oc apply -f - <<EOF
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sample-nginx
+  namespace: {namespace}
+  labels:
+    app: sample-nginx
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: sample-nginx
+  template:
+    metadata:
+      labels:
+        app: sample-nginx
+    spec:
+      containers:
+      - name: nginx
+        image: registry.access.redhat.com/ubi9/nginx-122:latest
+        ports:
+        - containerPort: 8080
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sample-nginx
+  namespace: {namespace}
+spec:
+  selector:
+    app: sample-nginx
+  ports:
+  - port: 8080
+    targetPort: 8080
+EOF
+----
+
+Wait ~30 seconds for the pods to start, then proceed to test queries.
+
+[TIP]
+====
+You can skip this step and still test Lightspeed with the platform components (coordination-engine, mcp-server, ML models), but having a sample app makes the queries more realistic.
+====
+
+=== Step 4.3: Test Cluster Health Queries
 
 Let's start with basic health checks that use the `get-cluster-health` MCP tool.
 
 **Query 1: Overall Cluster Health**
 
 Type in Lightspeed:
-[source]
+[source,subs="attributes+"]
 ----
 What is the overall health of the {namespace} namespace?
 ----
 
 **Expected Response:**
-[source]
+[source,subs="attributes+"]
 ----
 ✅ Cluster Health Summary for {namespace}:
 
-Healthy Components (4):
+Healthy Components (6):
 - coordination-engine: Running
 - mcp-server: Running
+- sample-nginx: 2/2 Running  ← Your sample app!
 - anomaly-detector-predictor: 2/2 Running
 - predictive-analytics-predictor: 2/2 Running
 
@@ -679,25 +738,30 @@ ML Models Status:
 Recent Activity:
 - 0 incidents in the last hour
 - All systems operational
+
+Everything looks healthy!
 ----
+
+🎯 **What just happened?** Lightspeed used the `get-cluster-health` MCP tool to query your cluster, check pod status, and verify ML models are ready.
 
 **MCP Tool Used:** `get-cluster-health`
 
 **Query 2: Check for Issues**
 
-[source]
+[source,subs="attributes+"]
 ----
-Are there any unhealthy pods in the {namespace} namespace?
+Are there any unhealthy pods in {namespace}?
 ----
 
 **Expected Response:**
-[source]
+[source,subs="attributes+"]
 ----
 ✅ All pods in {namespace} are healthy!
 
-Status: 8/8 pods Running
+Status: 10/10 pods Running
 - coordination-engine-0: Running (uptime: 2d)
 - mcp-server-xxx: Running (uptime: 2d)
+- sample-nginx-xxx (2 pods): Running
 - anomaly-detector-predictor-xxx (2 pods): Running
 - predictive-analytics-predictor-xxx (2 pods): Running
 
@@ -706,7 +770,38 @@ No issues detected.
 
 **MCP Tool Used:** `get-cluster-health` with pod filtering
 
-=== Step 4.3: Test Pod Management Queries
+**Query 3: Check Other Namespaces**
+
+You can also query other namespaces! Try:
+
+[source]
+----
+Are there any issues in the openshift-lightspeed namespace?
+----
+
+**Expected Response:**
+[source]
+----
+✅ Namespace openshift-lightspeed looks healthy!
+
+Pods: 3/3 Running
+- lightspeed-app-server-xxx: Running
+- lightspeed-console-plugin-xxx: Running
+- ols-postgres-xxx: Running
+
+No issues detected.
+----
+
+Or check multiple namespaces at once:
+
+[source,subs="attributes+"]
+----
+Compare the health of {namespace} and openshift-lightspeed namespaces
+----
+
+🎯 **Lightspeed is cluster-aware!** You can ask about any namespace you have access to, not just the platform namespace.
+
+=== Step 4.4: Test Pod Management Queries
 
 These queries use the `list-pods` MCP tool to retrieve detailed pod information.
 
@@ -779,7 +874,7 @@ Recent Events: None (stable)
 
 **MCP Tool Used:** `list-pods` with pod name filter
 
-=== Step 4.4: Test ML Model Queries
+=== Step 4.5: Test ML Model Queries
 
 These queries use the `list-models` and `get-model-status` MCP tools.
 
@@ -855,7 +950,7 @@ The model is healthy and performing well!
 
 **MCP Tool Used:** `get-model-status`
 
-=== Step 4.5: Test Anomaly Detection Queries
+=== Step 4.6: Test Anomaly Detection Queries
 
 These queries use the `analyze-anomalies` MCP tool to run ML-based detection.
 
@@ -924,7 +1019,7 @@ No action required - all systems operating normally.
 
 **MCP Tool Used:** `analyze-anomalies` with resource focus
 
-=== Step 4.6: Test Resource Analysis Queries
+=== Step 4.7: Test Resource Analysis Queries
 
 These queries use `get-cluster-health` and custom analysis tools.
 
@@ -991,7 +1086,7 @@ Recommendations: No scaling needed
 
 **MCP Tool Used:** `get-cluster-health` with memory sorting
 
-=== Step 4.7: Test MCP Catalog Queries
+=== Step 4.8: Test MCP Catalog Queries
 
 These queries use the internal MCP catalog tools.
 
@@ -1072,7 +1167,7 @@ Response time: ~200-500ms
 
 **MCP Tool Used:** Internal tool introspection
 
-=== Step 4.8: Verify MCP Server Tool Calls
+=== Step 4.9: Verify MCP Server Tool Calls
 
 As you try these queries, you can watch the MCP Server logs to see which tools are being invoked:
 
@@ -1097,7 +1192,7 @@ oc logs -f deployment/mcp-server -n {namespace}
 
 🎯 **What you've accomplished:** You've now verified that Lightspeed can successfully use all 7 core MCP tools through natural language queries!
 
-=== Step 4.9: Troubleshooting
+=== Step 4.10: Troubleshooting
 
 **Problem: Lightspeed doesn't respond to queries**
 
