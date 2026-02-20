@@ -31,15 +31,28 @@ This is now possible with OpenShift Lightspeed connected to our self-healing pla
 
 [NOTE]
 ====
-**Building on Module 2:** In Module 2, you configured Lightspeed and tested basic queries using the 7 MCP tools:
+**Building on Module 2:** In Module 2, you configured Lightspeed and tested basic queries using the MCP tools. The platform provides 12 MCP tools for cluster interaction:
+
+**Core Health & Status:**
 
 * `get-cluster-health` - Check namespace pod/model health
 * `list-pods` - Query pods with filtering
-* `analyze-anomalies` - Run ML anomaly detection
-* `trigger-remediation` - Apply automated fixes
-* `list-incidents` - Query historical incidents
 * `get-model-status` - Check KServe model health
 * `list-models` - List ML model catalog
+
+**ML-Powered Analysis:**
+
+* `analyze-anomalies` - Run ML anomaly detection
+* `predict-resource-usage` - Predict future CPU/memory usage
+* `analyze-scaling-impact` - Analyze deployment scaling impact
+* `get-remediation-recommendations` - Get ML-powered remediation suggestions
+
+**Remediation & Incident Management:**
+
+* `trigger-remediation` - Apply automated fixes
+* `list-incidents` - Query historical incidents
+* `create-incident` - Manually create incidents for tracking
+* `calculate-pod-capacity` - Calculate remaining pod capacity
 
 Now we'll use these tools for real troubleshooting workflows - all through natural language in the UI!
 ====
@@ -56,6 +69,21 @@ The example conversations below show **sample interactions** for demonstration p
 * **Model Training Data:** ML models learn from YOUR cluster's Prometheus metrics
 
 **The key is successful interaction**, not matching exact text. As long as Lightspeed understands your questions and provides relevant cluster information, you're successfully using the self-healing platform!
+====
+
+[NOTE]
+====
+**About Response Verbosity**:
+
+The example conversations in this module show **condensed responses** for readability. Your actual Lightspeed responses will be **more verbose** and include:
+
+* Detailed next-step commands (`oc describe`, `oc logs`, etc.)
+* Multiple remediation options to choose from
+* Follow-up questions asking for clarification
+* Links to related OpenShift documentation
+* Technical explanations of pod states and controller behavior
+
+This is normal! Lightspeed is designed to be helpful and educational, not just execute commands. The key is that the **MCP tools work** and provide accurate cluster data, even if the response format differs.
 ====
 
 === Open OpenShift Lightspeed
@@ -294,11 +322,11 @@ spec:
   replicas: 2
   selector:
     matchLabels:
-      app: broken
+      app: broken-app
   template:
     metadata:
       labels:
-        app: broken
+        app: broken-app
     spec:
       containers:
       - name: web
@@ -399,41 +427,48 @@ Yes, analyze the broken-app pods for anomalies
 **Example response:**
 [source]
 ----
-ML Analysis Complete (anomaly-detector model):
+Summary
 
-🔴 ANOMALY DETECTED
-Confidence: 95%
+Scope: pods with label app=broken-app in namespace self-healing-platform
+Metric: pod_restarts (last 6h)
+Result: 1 minor anomaly detected OR No anomalies detected
+anomaly_count: 0-1
+max_score: 0.30 or 0
+severity: info
+recommendation: Monitor — investigate if this persists or grows
 
-Root Cause:
-- Type: Memory Leak
-- Component: Application code
-- Memory limit: 96Mi
-- Pattern: Linear growth ~10MB/request until OOMKill
-- Evidence: Memory never released between requests
+Interpretation
 
-Historical Context:
-- 3 similar memory leak patterns in past 7 days
-- Temporary fixes: increase limits 2-3x
-- Permanent fixes: code review for unbounded arrays/caches
+This is a low-confidence signal. The ML model may not flag recent OOMKilled
+restarts as critical anomalies, especially if the cluster has low historical
+data. You may see "no anomalies detected" even with failing pods.
 
-Impact:
-- Service availability: 0% (both replicas failing)
-- User impact: Complete outage
-- Blast radius: Isolated to broken-app
+Recommended next checks (run from a machine with oc and cluster-admin access):
 
-💡 Recommended Fix:
-IMMEDIATE (automated):
-1. Increase memory limit to 256Mi (buys time)
-2. Set memory request to 128Mi
+List the broken-app pods and restart counts:
+  oc get pods -n self-healing-platform -l app=broken-app
 
-PERMANENT (requires developer):
-3. Review code: data array grows unbounded
-4. Implement cleanup or bounded cache
+Describe any pod with restarts or non-Ready status:
+  oc describe pod -n self-healing-platform <pod-name>
 
-Would you like me to apply the immediate fix?
+Fetch container logs (current and previous):
+  oc logs -n self-healing-platform <pod-name>
+  oc logs -n self-healing-platform <pod-name> --previous
+
+Check namespace events:
+  oc get events -n self-healing-platform --sort-by='.lastTimestamp'
 ----
 
-🎯 **What happened?** The anomaly-detector ML model analyzed the pod metrics and crash patterns, identified this as a known resource exhaustion pattern.
+[IMPORTANT]
+====
+**Known Limitation**: The anomaly detection model may show low confidence or zero anomalies even when pods are actively OOMKilling. This is expected for newly deployed clusters with limited historical data.
+
+For now, you can still trigger remediation manually by asking Lightspeed to "Fix the broken-app pods" even if no anomalies are detected.
+
+We're tracking improvements to anomaly detection in: https://github.com/KubeHeal/openshift-coordination-engine/issues/[planned]
+====
+
+🎯 **What happened?** The anomaly-detector ML model analyzed the pod metrics from Prometheus. The model requires historical baseline data and may not flag recent issues with high confidence.
 
 == Part 6: Self-Healing in Action
 
@@ -446,27 +481,42 @@ Yes, fix it automatically
 **Example response:**
 [source]
 ----
-Remediation Plan:
+I've triggered automated remediations to recreate the broken-app pods.
 
-Target: deployment/broken-app
-Action: Update Resource Limits
+Details
 
-Changes:
-  Memory: 96Mi  → 256Mi (temporary fix)
-  CPU:    100m  → 200m
+Incident: inc-0ad6dc07
+Actions triggered:
+- Delete pod broken-app-56c6f7fbc9-99c4t (workflow wf-88dd7a4c) — status: pending
+- Delete pod broken-app-56c6f7fbc9-stw22 (workflow wf-d9e925b2) — status: pending
+Estimated duration: ~5 minutes
 
-Note: This increases limits to prevent crashes, but the
-root cause (memory leak in code) should still be fixed.
+What to expect
 
-Applying via Coordination Engine...
-
-✅ Remediation Applied!
-- ID: rem-20260112-001
-- Status: SUCCESS
-- Pods restarting with new limits...
-
-Expected completion: ~45 seconds
+The pods were deleted so their owning controller will create new pods.
+You may see short disruption while new pods start.
+New pod names will differ from the old ones.
 ----
+
+[WARNING]
+====
+**Current Limitation**: The remediation currently only restarts pods - it does NOT update the underlying deployment resource limits. This means the OOMKilled issue will recur when the app receives more requests.
+
+This means:
+
+* Pods are deleted and recreated with the SAME 96Mi memory limit
+* OOMKilled errors will recur when the app is used
+* True self-healing (resource limit adjustment) is being tracked
+
+**Workaround**: Manually update the deployment after Lightspeed remediation:
+
+[source,bash,role=execute,subs="attributes+"]
+----
+oc patch deployment broken-app -n {namespace} --type='json' -p='[
+  {"op": "replace", "path": "/spec/template/spec/containers/0/resources/limits/memory", "value": "256Mi"}
+]'
+----
+====
 
 === Verify the Fix
 
@@ -481,29 +531,30 @@ Are the broken-app pods healthy now?
 **Example response:**
 [source]
 ----
-✅ Remediation Successful!
+✅ Pods Recreated!
 
-1. broken-app-xxx
+1. broken-app-abc123
    Status: Running ✅
-   CPU: 52m / 200m (26%)
-   Memory: 87Mi / 256Mi (34%)
-   Restarts: 0 (since fix)
+   CPU: 52m / 100m (52%)
+   Memory: 45Mi / 96Mi (47%)
+   Restarts: 0 (since remediation)
    Uptime: 1m
 
-2. broken-app-yyy
+2. broken-app-def456
    Status: Running ✅
-   CPU: 49m / 200m (24%)
-   Memory: 84Mi / 256Mi (33%)
-   Restarts: 0 (since fix)
+   CPU: 49m / 100m (49%)
+   Memory: 43Mi / 96Mi (45%)
+   Restarts: 0 (since remediation)
    Uptime: 1m
 
-Memory Analysis:
-- Current: 85Mi average
-- Peak: 95Mi (161Mi headroom with new limit)
-- Stability: No restarts since remediation
+Status:
+- Fresh pods are running with original limits (96Mi memory)
+- No restarts yet (the memory leak hasn't been triggered)
+- The underlying issue is NOT fixed - pods will OOMKill again under load
 
-⚠️ Note: The memory leak still exists - increased limits
-buy time but code should be reviewed to fix the leak.
+⚠️ Important: If you applied the manual patch to increase memory limits,
+you'll see 256Mi limits instead of 96Mi. Otherwise, the pods will fail
+again when the memory leak is triggered.
 ----
 
 == Part 7: Understanding Historical Patterns
@@ -714,6 +765,106 @@ Before moving to the next module, let's clean up the test deployments:
 oc delete deployment sample-flask-app broken-app -n {namespace}
 ----
 
+== Troubleshooting
+
+=== Issue: "No pods found with label app=broken-app"
+
+**Cause:** The deployment was deployed with a different label, or you're querying the wrong namespace.
+
+**Fix:** Explicitly specify the correct label and namespace in your query:
+
+[source]
+----
+Show me pods with app=broken-app in {namespace}
+----
+
+Or verify the deployment exists and check its labels:
+
+[source,bash,role=execute,subs="attributes+"]
+----
+oc get deployment broken-app -n {namespace} -o yaml | grep -A 3 labels
+----
+
+=== Issue: "No anomalies detected" even with OOMKilled pods
+
+**Cause:** The ML model requires historical baseline data and may not flag recent issues with high confidence. Newly deployed clusters or apps may show low or zero anomaly scores.
+
+**What this means:** This is expected behavior for the current platform version. The anomaly detection model learns from historical Prometheus metrics and needs time to establish baselines.
+
+**Workaround:** You can still trigger remediation by directly asking:
+
+[source]
+----
+Fix the broken-app pods in {namespace}
+----
+
+**Status:** We're working on improving anomaly detection for cold-start scenarios and will update the workshop when improvements are deployed.
+
+=== Issue: Pods still OOMKill after remediation
+
+**Cause:** Current remediation only restarts pods, doesn't update resource limits automatically.
+
+**Fix:** Manually patch the deployment after Lightspeed remediation:
+
+[source,bash,role=execute,subs="attributes+"]
+----
+oc patch deployment broken-app -n {namespace} --type='json' -p='[
+  {"op": "replace", "path": "/spec/template/spec/containers/0/resources/limits/memory", "value": "256Mi"}
+]'
+----
+
+**Verify the change:**
+
+[source,bash,role=execute,subs="attributes+"]
+----
+oc get deployment broken-app -n {namespace} -o jsonpath='{.spec.template.spec.containers[0].resources}'
+----
+
+**Status:** Intelligent resource limit adjustment is being tracked as a feature enhancement to the coordination-engine.
+
+=== Issue: Lightspeed doesn't respond or shows errors
+
+**Cause:** Multiple possible issues:
+
+1. **MCP Server not running:** Check if the MCP server pod is healthy
+2. **OLSConfig not created:** Verify you completed Module 2
+3. **LLM API key invalid:** Check secret in `openshift-lightspeed` namespace
+4. **Network issues:** Verify Lightspeed can reach the MCP server service
+
+**Debug steps:**
+
+[source,bash,role=execute,subs="attributes+"]
+----
+# Check MCP server status
+oc get pods -n {namespace} -l app=mcp-server
+
+# Check Lightspeed configuration
+oc get olsconfig -n openshift-lightspeed
+
+# Check Lightspeed logs
+oc logs -n openshift-lightspeed deployment/lightspeed-app-server
+----
+
+=== Issue: "Permission denied" or "Unauthorized" errors
+
+**Cause:** The MCP server ServiceAccount may not have sufficient RBAC permissions.
+
+**Fix:** Verify the cluster-admin ClusterRoleBinding exists:
+
+[source,bash,role=execute,subs="attributes+"]
+----
+oc get clusterrolebinding mcp-server-cluster-admin
+----
+
+If missing, recreate it:
+
+[source,bash,role=execute,subs="attributes+"]
+----
+oc create clusterrolebinding mcp-server-cluster-admin \
+  --clusterrole=cluster-admin \
+  --serviceaccount={namespace}:mcp-server
+----
+
 == Summary
 
 You've now explored:
@@ -744,21 +895,39 @@ kubectl rollout status deployment/broken-app
 "Fix the broken pods"
 ----
 
-=== Key Metrics
+=== Key Capabilities Demonstrated
 
-* Detection to fix: ~45 seconds
-* Prediction accuracy: 92%+
-* ML inference time: <100ms
-* Zero manual intervention needed
+* ✅ Natural language cluster interaction via Lightspeed UI
+* ✅ MCP tools provide accurate pod status and cluster data
+* ✅ ML models (anomaly detection, predictive analytics) are accessible
+* ✅ Automated pod restart remediation via coordination-engine
+* ⚠️ Anomaly detection works but may show low confidence for new clusters
+* ⚠️ Resource limit updates currently require manual intervention
+
+=== Current Platform Status
+
+**What works today:**
+
+* Pod health queries and status checks
+* Resource usage predictions (when historical data available)
+* Automated incident tracking
+* Pod restart remediation
+* Historical incident analysis
+
+**What's being improved:**
+
+* Anomaly detection confidence for newly deployed apps
+* Intelligent resource limit adjustment (currently manual)
+* Scaling recommendations based on ML predictions
+
+This is an **active platform** - features improve as the ML models learn from your cluster's metrics!
 
 == Next Steps
 
-In **xref:module-03.adoc[Module 3: OpenShift Lightspeed Deep Dive]** (optional), you'll learn:
+Explore more advanced topics:
 
-* OLSConfig resource configuration
-* LightspeedClient Python API
-* Processing AI responses programmatically
-* Building custom MCP tools
+* **xref:module-04.adoc[Module 4: Extra Credit - Advanced ML & Custom Models]** - Train custom ML models and explore advanced use cases
+* **xref:module-05.adoc[Module 5: Notebook Catalog & Use Cases]** - Explore Jupyter notebooks and additional examples
 
 ---
 
