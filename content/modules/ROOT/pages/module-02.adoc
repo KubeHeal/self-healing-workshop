@@ -627,6 +627,20 @@ Wait for `lightspeed-app-server` to be Running (~2-3 minutes).
 
 Now that Lightspeed is configured, let's thoroughly test it with hands-on queries. This section demonstrates all 7 MCP tools through natural language interaction.
 
+[IMPORTANT]
+====
+**About Response Examples in This Section:**
+
+The "Example Response" sections below show **sample outputs** for illustration purposes. Your actual Lightspeed responses **will vary** based on:
+
+* **LLM Model Used:** GPT-4o, vLLM (Llama 3.2), Gemini, etc. produce different response formats
+* **Cluster State:** Your actual pod counts, resource usage, and component status
+* **Components Deployed:** Optional sample app (Step 4.2) affects pod listings
+* **Response Style:** Different models use different formatting, tone, and detail levels
+
+**Don't worry if your responses don't match exactly!** As long as Lightspeed provides relevant information about your cluster, the integration is working correctly.
+====
+
 [NOTE]
 ====
 **For vLLM Users (Option C):** Llama 3.2 1B is a smaller model than GPT-4o. Responses may be:
@@ -719,7 +733,7 @@ Type in Lightspeed:
 What is the overall health of the {namespace} namespace?
 ----
 
-**Expected Response:**
+**Example Response:**
 [source,subs="attributes+"]
 ----
 ✅ Cluster Health Summary for {namespace}:
@@ -753,7 +767,7 @@ Everything looks healthy!
 Are there any unhealthy pods in {namespace}?
 ----
 
-**Expected Response:**
+**Example Response:**
 [source,subs="attributes+"]
 ----
 ✅ All pods in {namespace} are healthy!
@@ -779,7 +793,7 @@ You can also query other namespaces! Try:
 Are there any issues in the openshift-lightspeed namespace?
 ----
 
-**Expected Response:**
+**Example Response:**
 [source]
 ----
 ✅ Namespace openshift-lightspeed looks healthy!
@@ -812,7 +826,7 @@ These queries use the `list-pods` MCP tool to retrieve detailed pod information.
 List all pods in the {namespace} namespace with their resource usage
 ----
 
-**Expected Response:**
+**Example Response:**
 [source]
 ----
 Found 8 pods in {namespace}:
@@ -845,7 +859,7 @@ All pods are healthy!
 Show me details about the coordination-engine pod
 ----
 
-**Expected Response:**
+**Example Response:**
 [source]
 ----
 Coordination Engine Pod Details:
@@ -885,7 +899,7 @@ These queries use the `list-models` and `get-model-status` MCP tools.
 What ML models are available in the platform?
 ----
 
-**Expected Response:**
+**Example Response:**
 [source]
 ----
 ML Model Catalog ({namespace}):
@@ -923,7 +937,7 @@ Both models are healthy and ready for inference!
 Show me the status of the anomaly-detector model
 ----
 
-**Expected Response:**
+**Example Response:**
 [source]
 ----
 Model: anomaly-detector
@@ -961,7 +975,7 @@ These queries use the `analyze-anomalies` MCP tool to run ML-based detection.
 Are there any anomalies in the {namespace} namespace?
 ----
 
-**Expected Response:**
+**Example Response:**
 [source]
 ----
 Anomaly Detection Scan Complete:
@@ -991,7 +1005,7 @@ Scan time: 0.34s
 Check for unusual CPU or memory usage patterns in the cluster
 ----
 
-**Expected Response:**
+**Example Response:**
 [source]
 ----
 Resource Usage Pattern Analysis:
@@ -1030,7 +1044,7 @@ These queries use `get-cluster-health` and custom analysis tools.
 Show me CPU usage across all pods in {namespace}
 ----
 
-**Expected Response:**
+**Example Response:**
 [source]
 ----
 CPU Usage Report ({namespace}):
@@ -1063,7 +1077,7 @@ Headroom: 6044m (97.5%) available
 Which pods are using the most memory in {namespace}?
 ----
 
-**Expected Response:**
+**Example Response:**
 [source]
 ----
 Memory Usage Report ({namespace}):
@@ -1097,7 +1111,7 @@ These queries use the internal MCP catalog tools.
 What tools are available in the MCP server?
 ----
 
-**Expected Response:**
+**Example Response:**
 [source]
 ----
 MCP Server Tool Catalog:
@@ -1132,7 +1146,7 @@ All tools are accessible via natural language queries!
 Explain the get-cluster-health tool
 ----
 
-**Expected Response:**
+**Example Response:**
 [source]
 ----
 MCP Tool: get-cluster-health

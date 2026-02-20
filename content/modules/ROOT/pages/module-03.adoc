@@ -44,6 +44,20 @@ This is now possible with OpenShift Lightspeed connected to our self-healing pla
 Now we'll use these tools for real troubleshooting workflows - all through natural language in the UI!
 ====
 
+[IMPORTANT]
+====
+**About Lightspeed Responses in This Module:**
+
+The example conversations below show **sample interactions** for demonstration purposes. Your actual Lightspeed responses **will differ** based on:
+
+* **LLM Model:** GPT-4o, vLLM (Llama 3.2), Gemini, etc. generate different response styles
+* **Your Cluster State:** Actual resource usage, pod counts, and issues you encounter
+* **Deployed Apps:** What you deploy in Part 2 affects predictions and analysis results
+* **Model Training Data:** ML models learn from YOUR cluster's Prometheus metrics
+
+**The key is successful interaction**, not matching exact text. As long as Lightspeed understands your questions and provides relevant cluster information, you're successfully using the self-healing platform!
+====
+
 === Open OpenShift Lightspeed
 
 . Navigate to your OpenShift web console: {openshift_console_url}
@@ -58,7 +72,7 @@ Now we'll use these tools for real troubleshooting workflows - all through natur
 What's the health of the {namespace} namespace?
 ----
 
-**Lightspeed responds:**
+**Example response:**
 [source]
 ----
 ✅ Cluster Health Summary for {namespace}:
@@ -143,7 +157,7 @@ Wait about 30 seconds for the pods to start, then use Lightspeed to verify:
 Show me the sample-flask-app pods in the {namespace} namespace
 ----
 
-**Lightspeed responds:**
+**Example response:**
 [source]
 ----
 Found 2 pods for sample-flask-app:
@@ -175,7 +189,7 @@ This is where the ML models shine! Let's ask about future resource usage.
 What will the CPU and memory usage be at 3 PM today?
 ----
 
-**Lightspeed responds:**
+**Example response:**
 [source]
 ----
 Confirmed prediction for 15:00 today (cluster-wide)
@@ -226,7 +240,7 @@ Which would you like?
 If I scale sample-flask-app to 5 replicas, what will happen to memory usage?
 ----
 
-**Lightspeed responds:**
+**Example response:**
 [source]
 ----
 Scaling Impact Analysis:
@@ -350,7 +364,7 @@ Request 9: Allocated 1 chunks (10MB total)  ← Pod restarted!
 Are there any failing pods in the {namespace} namespace?
 ----
 
-**Lightspeed responds:**
+**Example response:**
 [source]
 ----
 ⚠️ Found 2 pods with issues:
@@ -382,7 +396,7 @@ Would you like me to analyze these for anomalies?
 Yes, analyze the broken-app pods for anomalies
 ----
 
-**Lightspeed responds:**
+**Example response:**
 [source]
 ----
 ML Analysis Complete (anomaly-detector model):
@@ -429,7 +443,7 @@ Would you like me to apply the immediate fix?
 Yes, fix it automatically
 ----
 
-**Lightspeed responds:**
+**Example response:**
 [source]
 ----
 Remediation Plan:
@@ -464,7 +478,7 @@ After 45 seconds:
 Are the broken-app pods healthy now?
 ----
 
-**Lightspeed responds:**
+**Example response:**
 [source]
 ----
 ✅ Remediation Successful!
@@ -500,7 +514,7 @@ buy time but code should be reviewed to fix the leak.
 Show me recent incidents and how they were resolved
 ----
 
-**Lightspeed responds:**
+**Example response:**
 [source]
 ----
 Incident History (Last 24 Hours):
@@ -532,6 +546,11 @@ fix (increase limits) and permanent fix (code review).
 ----
 
 == Part 8: More Conversations to Try
+
+[NOTE]
+====
+These are **example conversation flows** showing possible interactions. Your actual conversations will vary based on your LLM model and cluster state. Use these as inspiration for questions to ask!
+====
 
 === Troubleshooting
 
