@@ -59,7 +59,7 @@ class LightspeedClient:
             }
 
             response = self.session.post(
-                f"{self.server_url}/query",
+                f"{self.server_url}/v1/query",
                 json=payload,
                 timeout=self.timeout
             )
@@ -92,7 +92,7 @@ class LightspeedClient:
             }
 
             response = self.session.post(
-                f"{self.server_url}/recommendations",
+                f"{self.server_url}/v1/recommendations",
                 json=payload,
                 timeout=self.timeout
             )
