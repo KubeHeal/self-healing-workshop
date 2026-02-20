@@ -29,6 +29,21 @@ This is now possible with OpenShift Lightspeed connected to our self-healing pla
 
 == Part 1: Your First Conversation - Health Check
 
+[NOTE]
+====
+**Building on Module 2:** In Module 2, you configured Lightspeed and tested basic queries using the 7 MCP tools:
+
+* `get-cluster-health` - Check namespace pod/model health
+* `list-pods` - Query pods with filtering
+* `analyze-anomalies` - Run ML anomaly detection
+* `trigger-remediation` - Apply automated fixes
+* `list-incidents` - Query historical incidents
+* `get-model-status` - Check KServe model health
+* `list-models` - List ML model catalog
+
+Now we'll use these tools for real troubleshooting workflows - all through natural language in the UI!
+====
+
 === Open OpenShift Lightspeed
 
 . Navigate to your OpenShift web console: {openshift_console_url}
