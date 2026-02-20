@@ -945,6 +945,15 @@ All Python examples are available in a pre-built container image with scripts an
 The container image was automatically built during platform deployment and is ready to use.
 ====
 
+[NOTE]
+====
+If you get an error like "pod already exists", delete the existing pod first:
+[source,bash,role=execute,subs="attributes+"]
+----
+oc delete pod lightspeed-examples -n {namespace}
+----
+====
+
 [source,bash,role=execute,subs="attributes+"]
 ----
 # Run the container interactively
