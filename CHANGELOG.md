@@ -16,7 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Right-sizing workflow and disk-full ETA lab exercises — [#5](https://github.com/KubeHeal/self-healing-workshop/issues/5)
 
 #### Infrastructure
-- Add `LICENSE` file; pin Antora version from `master` to `1.0` for reproducible builds — [#3](https://github.com/KubeHeal/self-healing-workshop/issues/3)
+- Add `LICENSE` file (Apache-2.0) — resolves missing license for galaxy.yml declaration
+- OCP 4.21 support: update prerequisite documentation to recommend 4.19+ / 4.21 current; move 4.18 to maintenance note
+- Pin Antora version from `master` to `1.0` for reproducible builds — [#3](https://github.com/KubeHeal/self-healing-workshop/issues/3)
 - Pin `content.sources` refs to CE/MCP/operator release tags and cut `v1.0.0` tag — [#6](https://github.com/KubeHeal/self-healing-workshop/issues/6)
 - Verify `deploy-pages` and `build-python-examples` CI workflows pass; document branch protection — [#1](https://github.com/KubeHeal/self-healing-workshop/issues/1)
 

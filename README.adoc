@@ -33,7 +33,7 @@ This workshop demonstrates the **OpenShift AI Ops Self-Healing Platform** - an A
 
 === Prerequisites
 
-* OpenShift 4.18+ cluster with admin access
+* OpenShift 4.19+ cluster recommended (4.21 current; 4.18 maintenance)
 * Red Hat Demo Platform AWS sandbox (recommended)
 * LLM API key (OpenAI, Google Gemini, or Anthropic)
 
@@ -70,7 +70,7 @@ This deployment method uses the comprehensive instructions from the main OpenShi
 
 ==== Prerequisites
 
-- OpenShift 4.18+ cluster with admin access
+- OpenShift 4.19+ cluster recommended (4.21 current; 4.18 maintenance)
 - Local workstation with:
   - `podman` - Container runtime
   - `oc`, `kubectl`, `helm` - Kubernetes CLIs

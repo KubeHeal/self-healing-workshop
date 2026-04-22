@@ -124,7 +124,7 @@ Before submitting to the RHDP catalog:
 - [ ] Start/stop/status lifecycle tested
 - [ ] Showroom lab guide renders correctly on RHDP
 - [ ] Workshop duration estimate documented in catalog entry
-- [ ] Prerequisite cluster topology (OCP 4.18+, RHOAI, GPU node) documented
+- [ ] Prerequisite cluster topology (OCP 4.19+ recommended; 4.21 current; RHOAI, GPU node) documented
 
 ---
 
